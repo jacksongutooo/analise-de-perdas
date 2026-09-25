@@ -21,10 +21,15 @@ automática dos documentos, conferência de valores e solicitação de documento
 
 ## Prévia sem servidor
 
-`previa/index.html` é uma prévia navegável do site com dados fictícios: abre com dois cliques no navegador
-(precisa de internet só para carregar estilos e fonte). Ela usa os mesmos componentes desta versão do projeto, com
-um "servidor simulado" no próprio navegador, e serve para apresentar o fluxo a clientes. Não substitui o sistema:
-nada é enviado nem guardado fora do navegador. Painel na prévia: `demo@example.com` / `demonstracao-2026`.
+`previa/index.html` é uma prévia navegável do site com dados fictícios: abre no navegador sem instalar nada
+(precisa de internet só para carregar estilos, fonte e, ao visualizar PDFs, o pdf.js). Ela roda **o próprio código
+desta versão** — páginas, ações e rotas `/api` — sobre um banco simulado no navegador, com os mesmos casos fictícios
+do seed, e serve para apresentar o fluxo a clientes. Não substitui o sistema: nada é enviado nem guardado fora do
+navegador. Painel na prévia: `demo@example.com` / `demonstracao-2026`.
+
+Para gerar de novo depois de alterar o site: `npm run previa` (script `scripts/build-previa.mjs`, código de apoio em
+`previa/src/`). A prévia inclui atalhos que não existem no site real: casos fictícios para abrir direto, CPF de
+exemplo e arquivos de exemplo do ComprovaBet (com o CPF informado, com outro CPF e uma foto).
 
 ## Rodando localmente
 
@@ -268,3 +273,4 @@ automática de CSV, XLSX e PDF.
 | `npm run admin:create -- --email ... --name ...` | cria ou atualiza acesso da equipe (`--role analyst` opcional) |
 | `npm test` | testes automatizados |
 | `npm run typecheck` | checagem de tipos |
+| `npm run previa` | gera a prévia navegável (`previa/index.html`) |

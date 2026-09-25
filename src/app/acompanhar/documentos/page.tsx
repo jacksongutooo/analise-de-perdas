@@ -60,7 +60,9 @@ export default async function DocumentosAdicionaisPage({ searchParams }: { searc
           <p className="mt-2 text-ink-soft">{COMPLEMENT_TEXT}</p>
 
           <div className="mt-6 rounded-2xl border border-warn-700/20 bg-warn-50 px-5 py-4">
-            {request.reasons.includes("cpf_mismatch") && <p className="mb-3 text-sm font-medium text-danger-700">{CPF_MISMATCH_MESSAGE}</p>}
+            {request.reasons.includes("cpf_mismatch") && !request.message?.includes(CPF_MISMATCH_MESSAGE) && (
+              <p className="mb-3 text-sm font-medium text-danger-700">{CPF_MISMATCH_MESSAGE}</p>
+            )}
             <p className="text-sm font-semibold text-warn-700">O que precisamos</p>
             <ul className="mt-2 list-disc space-y-1 pl-5 text-sm text-warn-700">
               {request.reasons.map((r) => (
