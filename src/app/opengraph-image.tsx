@@ -44,11 +44,11 @@ export default function OpenGraphImage() {
         <div style={{ display: "flex", flexDirection: "column" }}>
           <div style={{ display: "flex", fontSize: 80, fontWeight: 700, lineHeight: 1.05, letterSpacing: -2 }}>Teve perdas em apostas online?</div>
           <div style={{ display: "flex", marginTop: 24, fontSize: 34, color: "#3a4658" }}>
-            Envie suas informações e comprovantes para análise do seu caso.
+            {`Envie seu ComprovaBet ${config.comprovabetYear} para uma análise documental do seu caso.`}
           </div>
         </div>
         <div style={{ display: "flex", paddingTop: 28, borderTop: "2px solid #c5ced9", fontSize: 26, color: "#6a7585" }}>
-          {`100% online • Análise documental • Retorno em até ${config.reviewDays} dias`}
+          {"100% online • Análise documental • Acompanhamento em todas as etapas"}
         </div>
       </div>
     ),

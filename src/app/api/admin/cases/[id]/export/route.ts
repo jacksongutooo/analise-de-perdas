@@ -1,6 +1,7 @@
 import { logAccess } from "@/lib/audit";
 import { getAdmin } from "@/lib/auth/admin";
 import { demoScope } from "@/lib/cases/admin-queries";
+import { formatCpf } from "@/lib/cpf";
 import { prisma } from "@/lib/db";
 import { contentDisposition } from "@/lib/files/names";
 import { decimalToCents } from "@/lib/format";
@@ -17,7 +18,16 @@ import {
 } from "@/lib/options";
 import { clientIp, userAgent } from "@/lib/security";
 import { site } from "@/lib/site";
-import { CASE_STATUS_LABEL, DOCUMENT_STATUS_LABEL, type CaseStatusValue, type DocumentStatusValue } from "@/lib/status";
+import {
+  CASE_STATUS_LABEL,
+  CPF_CHECK_LABEL,
+  DOCUMENT_STATUS_LABEL,
+  PAYMENT_STATUS_LABEL,
+  type CaseStatusValue,
+  type CpfCheckValue,
+  type DocumentStatusValue,
+  type PaymentStatusValue,
+} from "@/lib/status";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -41,6 +51,7 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
       user: true,
       platforms: { include: { platform: true } },
       commitment: true,
+      agreements: { orderBy: { acceptedAt: "asc" } },
       statusHistory: { orderBy: { createdAt: "asc" } },
       requests: { orderBy: { createdAt: "asc" } },
       documents: { orderBy: { createdAt: "asc" } },
@@ -61,6 +72,7 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
     protocolo: c.protocol,
     titular: {
       nome: c.user.fullName,
+      cpf: c.user.cpf ? formatCpf(c.user.cpf) : null,
       email: c.user.email,
       whatsapp: c.user.whatsapp,
       declarouMaioridade: c.user.isAdult,
@@ -69,6 +81,10 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
       enviadaEm: c.createdAt.toISOString(),
       prazoEstimado: c.reviewDeadline.toISOString(),
       statusAtual: CASE_STATUS_LABEL[c.status as CaseStatusValue],
+      pagamento: {
+        situacao: PAYMENT_STATUS_LABEL[c.paymentStatus as PaymentStatusValue],
+        confirmadoEm: c.paymentConfirmedAt?.toISOString() ?? null,
+      },
       tipo: BET_TYPE_SUMMARY[c.betType],
       detalhe: detail,
       plataformas: c.platforms.map((p) => p.platform.name),
@@ -96,6 +112,14 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
             texto: c.commitment.text,
           }
         : null,
+      condicoesDoServico: c.agreements.map((a) => ({
+        aceito: a.accepted,
+        em: a.acceptedAt.toISOString(),
+        ip: a.ip,
+        navegador: a.userAgent,
+        versaoDoTexto: a.termsVersion,
+        texto: a.text,
+      })),
     },
     andamento: c.statusHistory.map((h) => ({
       status: CASE_STATUS_LABEL[h.toStatus as CaseStatusValue],
@@ -115,6 +139,12 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
       tamanhoEmBytes: d.sizeBytes,
       enviadoEm: d.createdAt.toISOString(),
       situacao: DOCUMENT_STATUS_LABEL[d.status as DocumentStatusValue],
+      ...(d.category === "comprovabet"
+        ? {
+            anoDeReferencia: d.referenceYear,
+            conferenciaDoCpf: d.cpfCheck ? CPF_CHECK_LABEL[d.cpfCheck as CpfCheckValue] : null,
+          }
+        : {}),
     })),
     observacao: "Os arquivos enviados podem ser entregues individualmente pelo botão Visualizar do painel.",
   };

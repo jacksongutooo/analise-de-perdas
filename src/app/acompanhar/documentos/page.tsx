@@ -7,6 +7,7 @@ import { SubmitButton } from "@/components/SubmitButton";
 import { AdditionalUpload } from "@/components/tracking/AdditionalUpload";
 import { Notice } from "@/components/ui";
 import { getTrackingCaseId } from "@/lib/auth/tracking";
+import { COMPLEMENT_TEXT, COMPLEMENT_TITLE, CPF_MISMATCH_MESSAGE } from "@/lib/comprovabet";
 import { prisma } from "@/lib/db";
 import { config } from "@/lib/env";
 import { REQUEST_REASONS, labelFor } from "@/lib/options";
@@ -32,7 +33,10 @@ export default async function DocumentosAdicionaisPage({ searchParams }: { searc
         select: {
           reasons: true,
           message: true,
-          documents: { orderBy: { createdAt: "asc" }, select: { id: true, originalName: true, sizeBytes: true, category: true } },
+          documents: {
+            orderBy: { createdAt: "asc" },
+            select: { id: true, originalName: true, sizeBytes: true, category: true, cpfCheck: true },
+          },
         },
       },
     },
@@ -52,10 +56,11 @@ export default async function DocumentosAdicionaisPage({ searchParams }: { searc
         </div>
       ) : (
         <>
-          <h1 className="mt-5 text-[1.9rem] font-semibold leading-tight tracking-tight text-ink">Precisamos de mais informações</h1>
-          <p className="mt-2 text-ink-soft">Envie os documentos solicitados para continuarmos a análise.</p>
+          <h1 className="mt-5 text-[1.9rem] font-semibold leading-tight tracking-tight text-ink">{COMPLEMENT_TITLE}</h1>
+          <p className="mt-2 text-ink-soft">{COMPLEMENT_TEXT}</p>
 
           <div className="mt-6 rounded-2xl border border-warn-700/20 bg-warn-50 px-5 py-4">
+            {request.reasons.includes("cpf_mismatch") && <p className="mb-3 text-sm font-medium text-danger-700">{CPF_MISMATCH_MESSAGE}</p>}
             <p className="text-sm font-semibold text-warn-700">O que precisamos</p>
             <ul className="mt-2 list-disc space-y-1 pl-5 text-sm text-warn-700">
               {request.reasons.map((r) => (
@@ -68,7 +73,14 @@ export default async function DocumentosAdicionaisPage({ searchParams }: { searc
           <AdditionalUpload
             platforms={c.platforms.map((p) => p.platform)}
             maxUploadMb={config.maxUploadMb}
-            initialFiles={request.documents.map((d) => ({ id: d.id, name: d.originalName, size: d.sizeBytes, category: d.category }))}
+            year={config.comprovabetYear}
+            initialFiles={request.documents.map((d) => ({
+              id: d.id,
+              name: d.originalName,
+              size: d.sizeBytes,
+              category: d.category,
+              manualCheck: d.category === "comprovabet" && d.cpfCheck !== "match" && d.cpfCheck !== "manual_match",
+            }))}
           />
 
           {erro === "vazio" && (
@@ -81,7 +93,7 @@ export default async function DocumentosAdicionaisPage({ searchParams }: { searc
               Concluir envio
             </SubmitButton>
           </form>
-          <p className="mt-3 text-sm text-muted">Ao concluir, seu caso volta para análise.</p>
+          <p className="mt-3 text-sm text-muted">Ao concluir, a equipe confere os novos documentos e seu caso segue para a próxima etapa.</p>
         </>
       )}
     </PageShell>

@@ -10,6 +10,8 @@ export type FileRowItem = {
   name: string;
   size: number;
   meta?: string;
+  /** Linha extra de orientação (ex.: conferência feita pela equipe). */
+  note?: string;
   progress?: number;
   error?: string | null;
   uploading?: boolean;
@@ -42,9 +44,10 @@ export function FileRow({ item, onRemove, onDismiss }: { item: FileRowItem; onRe
         </span>
         <div className="min-w-0 flex-1">
           <p className="truncate text-sm font-medium text-ink">{item.name}</p>
-          <p className={cx("text-xs", item.error ? "font-medium text-danger-700" : "text-muted")}>
+          <p className={cx(item.error ? "text-sm font-medium leading-snug text-danger-700" : "text-xs text-muted")}>
             {item.error ?? (item.uploading ? `Enviando… ${item.progress ?? 0}%` : [item.meta, formatBytes(item.size)].filter(Boolean).join(" · "))}
           </p>
+          {!item.error && !item.uploading && item.note && <p className="mt-0.5 text-xs leading-snug text-ink-soft">{item.note}</p>}
         </div>
         {item.error && onDismiss && (
           <button type="button" onClick={onDismiss} className="rounded-lg p-2 text-muted hover:bg-paper" aria-label="Dispensar aviso">

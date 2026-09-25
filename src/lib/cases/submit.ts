@@ -33,10 +33,22 @@ export async function submitCase(params: {
   const { platforms, aliases } = resolvePlatforms(data);
   if (!platforms.length) throw new SubmissionError("Selecione ao menos uma plataforma.", "platforms");
 
-  const draftDocs = await prisma.document.findMany({ where: { draftId }, select: { id: true, platformName: true, storageKey: true } });
-  const attach = draftDocs.filter((d) => d.platformName && aliases.has(d.platformName.toLowerCase()));
+  // O CPF vem do rascunho (registrado antes do envio do ComprovaBet e usado na conferência do documento).
+  const draft = await prisma.caseDraft.findUnique({ where: { id: draftId }, select: { cpf: true } });
+  const cpf = draft?.cpf ?? null;
+  if (!cpf) throw new SubmissionError("Informe seu CPF para continuar.", "cpf");
+
+  const draftDocs = await prisma.document.findMany({
+    where: { draftId },
+    select: { id: true, platformName: true, storageKey: true, category: true, cpfCheck: true },
+  });
+  const comprovabet = draftDocs.filter((d) => d.category === "comprovabet" && d.cpfCheck !== "mismatch");
+  if (!comprovabet.length) throw new SubmissionError("Envie o seu ComprovaBet para continuar.", "documents");
+  // Históricos por plataforma enviados antes da mudança para o ComprovaBet continuam aceitos como complemento.
+  const attach = draftDocs.filter(
+    (d) => comprovabet.includes(d) || (d.category !== "comprovabet" && d.platformName && aliases.has(d.platformName.toLowerCase())),
+  );
   const orphans = draftDocs.filter((d) => !attach.includes(d));
-  if (!attach.length) throw new SubmissionError("Envie ao menos um documento das plataformas selecionadas.", "documents");
 
   const phone = normalizePhoneBR(data.whatsapp);
   if (!phone) throw new SubmissionError("Informe um WhatsApp válido com DDD.", "whatsapp");
@@ -55,13 +67,13 @@ export async function submitCase(params: {
           if (claimed.count !== 1) throw new SubmissionError("Esta solicitação já foi enviada.", "draft");
 
           const existingUser = await tx.user.findFirst({
-            where: { email: data.email, whatsapp: phone, fullName: data.fullName, isDemo },
+            where: { email: data.email, whatsapp: phone, fullName: data.fullName, cpf, isDemo },
             select: { id: true },
           });
           const user =
             existingUser ??
             (await tx.user.create({
-              data: { fullName: data.fullName, email: data.email, whatsapp: phone, isAdult: true, isDemo },
+              data: { fullName: data.fullName, cpf, email: data.email, whatsapp: phone, isAdult: true, isDemo },
               select: { id: true },
             }));
 
@@ -136,7 +148,8 @@ export async function submitCase(params: {
               data: { caseId: caseRow.id, draftId: null, platformId: slug ? (slugToId.get(slug) ?? null) : null },
             });
           }
-          await tx.caseDraft.update({ where: { id: draftId }, data: { caseId: caseRow.id } });
+          // O CPF passa a existir só no cadastro do solicitante; o rascunho não guarda cópia.
+          await tx.caseDraft.update({ where: { id: draftId }, data: { caseId: caseRow.id, cpf: null } });
           return caseRow;
         },
         { timeout: 20_000 },

@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import type { ReactNode, RefObject } from "react";
+import { cpfDigits, maskCpfInput } from "@/lib/cpf";
 import { cx } from "@/lib/cx";
 import { formatBRL, maskPhoneInput, plural } from "@/lib/format";
 import {
@@ -190,7 +191,7 @@ export function PlatformsStep({ data, update, headingRef }: { data: WizardData; 
 }
 
 // ─── Etapa 3 ──────────────────────────────────────────────────────────────
-export function PeriodStep({ data, update, headingRef }: { data: WizardData; update: Update; headingRef: HeadingRef }) {
+export function PeriodStep({ data, update, headingRef, year }: { data: WizardData; update: Update; headingRef: HeadingRef; year: number }) {
   return (
     <>
       <StepHeading headingRef={headingRef} id="q-period" title="Há quanto tempo você utiliza essas plataformas?" />
@@ -201,7 +202,7 @@ export function PeriodStep({ data, update, headingRef }: { data: WizardData; upd
       </div>
       {data.period && (
         <div className="step-in mt-6 rounded-2xl border border-navy-100 bg-navy-50 px-5 py-4">
-          <p className="text-lg font-semibold leading-snug text-navy-900">Vamos analisar principalmente os últimos 12 meses.</p>
+          <p className="text-lg font-semibold leading-snug text-navy-900">Vamos analisar o ano de {year}, com base no seu ComprovaBet.</p>
         </div>
       )}
     </>
@@ -209,14 +210,14 @@ export function PeriodStep({ data, update, headingRef }: { data: WizardData; upd
 }
 
 // ─── Etapa 4 ──────────────────────────────────────────────────────────────
-export function AmountsStep({ data, update, headingRef }: { data: WizardData; update: Update; headingRef: HeadingRef }) {
+export function AmountsStep({ data, update, headingRef, year }: { data: WizardData; update: Update; headingRef: HeadingRef; year: number }) {
   return (
     <>
-      <StepHeading headingRef={headingRef} id="q-deposits" title="Aproximadamente quanto você depositou nos últimos 12 meses?" />
+      <StepHeading headingRef={headingRef} id="q-deposits" title={`Aproximadamente quanto você depositou em ${year}?`} />
       <MoneyInput id="deposits" ariaLabel="Total depositado" value={data.depositsCents} onChange={(v) => update({ depositsCents: v })} />
       <div className="mt-10">
         <label htmlFor="withdrawals" className="block text-[1.3rem] font-semibold leading-snug tracking-[-0.01em] text-ink">
-          Aproximadamente quanto conseguiu sacar?
+          E quanto conseguiu sacar em {year}?
         </label>
         <div className="mt-4">
           <MoneyInput id="withdrawals" ariaDescribedBy="withdrawals-hint" value={data.withdrawalsCents} onChange={(v) => update({ withdrawalsCents: v })} />
@@ -350,16 +351,66 @@ export function CommitmentStep({ data, update, headingRef, reviewDays }: { data:
   );
 }
 
-// ─── Dados de contato ─────────────────────────────────────────────────────
-export function ContactStep({ data, update, headingRef, showErrors }: { data: WizardData; update: Update; headingRef: HeadingRef; showErrors: boolean }) {
+// ─── Dados do solicitante ─────────────────────────────────────────────────
+export function ContactStep({
+  data,
+  update,
+  headingRef,
+  showErrors,
+  cpfLocked,
+  serverError,
+}: {
+  data: WizardData;
+  update: Update;
+  headingRef: HeadingRef;
+  showErrors: boolean;
+  /** Já existe ComprovaBet enviado com este CPF: para trocar o CPF, é preciso remover o arquivo. */
+  cpfLocked: boolean;
+  serverError?: string | null;
+}) {
   const errors = showErrors ? contactErrors(data) : {};
+  const cpfError = errors.cpf ?? serverError ?? null;
+  const savedCpf = Boolean(data.cpfMasked) && !data.cpf;
   return (
     <>
-      <StepHeading headingRef={headingRef} id="q-contact" title="Seus dados para contato" subtitle="Usamos apenas para falar sobre esta solicitação." />
+      <StepHeading headingRef={headingRef} id="q-contact" title="Seus dados" subtitle="Usamos apenas para esta solicitação." />
       <div className="space-y-5">
         <Field label="Nome completo" htmlFor="fullName" error={errors.fullName}>
           <TextInput id="fullName" autoComplete="name" maxLength={120} value={data.fullName} onChange={(e) => update({ fullName: e.target.value })} />
         </Field>
+        {savedCpf ? (
+          <div>
+            <p className="block text-sm font-medium text-ink">CPF</p>
+            <div className="mt-1.5 flex min-h-[3.25rem] items-center justify-between gap-3 rounded-xl border border-line-strong bg-paper px-3.5">
+              <span className="text-base tabular-nums tracking-wide text-ink">{data.cpfMasked}</span>
+              {!cpfLocked && (
+                <button
+                  type="button"
+                  onClick={() => update({ cpfMasked: null, cpf: "" })}
+                  className="rounded-md px-1.5 py-0.5 text-sm font-medium text-navy-700 hover:bg-navy-50"
+                >
+                  Alterar
+                </button>
+              )}
+            </div>
+            <p className="mt-1.5 text-xs leading-relaxed text-muted">
+              {cpfLocked ? "Para alterar o CPF, remova antes o ComprovaBet enviado na próxima etapa." : "O mesmo CPF do seu ComprovaBet."}
+            </p>
+          </div>
+        ) : (
+          <Field label="CPF" htmlFor="cpf" error={cpfError} hint="O mesmo CPF do seu ComprovaBet. Usamos para conferir o documento.">
+            <TextInput
+              id="cpf"
+              inputMode="numeric"
+              autoComplete="off"
+              placeholder="000.000.000-00"
+              maxLength={14}
+              value={maskCpfInput(data.cpf)}
+              onChange={(e) => update({ cpf: cpfDigits(e.target.value).slice(0, 11) })}
+              className="tabular-nums tracking-wide"
+            />
+          </Field>
+        )}
         <Field label="E-mail" htmlFor="email" error={errors.email} hint="Você vai usar este e-mail e o protocolo para acompanhar a análise.">
           <TextInput
             id="email"
@@ -429,12 +480,14 @@ export function ReviewStep({
   headingRef,
   platformNames,
   fileCount,
+  year,
   goTo,
 }: {
   data: WizardData;
   headingRef: HeadingRef;
   platformNames: string[];
   fileCount: number | null;
+  year: number;
   goTo: (s: Screen) => void;
 }) {
   const { loss } = declaredLoss(data);
@@ -442,16 +495,25 @@ export function ReviewStep({
     <>
       <StepHeading headingRef={headingRef} id="q-review" title="Confira sua solicitação" />
       <dl className="divide-y divide-line rounded-2xl border border-line bg-surface px-5 shadow-soft">
+        <ReviewRow label="Seus dados" onEdit={() => goTo("contact")}>
+          <span className="block">{data.fullName}</span>
+          <span className="block font-normal tabular-nums text-ink-soft">CPF {data.cpfMasked ?? "—"}</span>
+          <span className="block font-normal text-ink-soft">{data.email}</span>
+          <span className="block font-normal text-ink-soft">{data.whatsapp}</span>
+        </ReviewRow>
+        <ReviewRow label={`ComprovaBet ${year}`} onEdit={() => goTo("documents")}>
+          {fileCount === null ? <span className="font-normal text-muted">Carregando…</span> : plural(fileCount, "arquivo enviado", "arquivos enviados")}
+        </ReviewRow>
         <ReviewRow label="Tipo" onEdit={() => goTo("type")}>
           {data.betType ? BET_TYPE_SUMMARY[data.betType] : "—"}
         </ReviewRow>
         <ReviewRow label="Plataformas" onEdit={() => goTo("platforms")}>
           {platformNames.join(", ") || "—"}
         </ReviewRow>
-        <ReviewRow label="Total depositado informado" onEdit={() => goTo("amounts")}>
+        <ReviewRow label={`Total depositado informado (${year})`} onEdit={() => goTo("amounts")}>
           <span className="tabular-nums">{formatBRL(data.depositsCents ?? 0)}</span>
         </ReviewRow>
-        <ReviewRow label="Total sacado informado" onEdit={() => goTo("amounts")}>
+        <ReviewRow label={`Total sacado informado (${year})`} onEdit={() => goTo("amounts")}>
           <span className="tabular-nums">{formatBRL(data.withdrawalsCents ?? 0)}</span>
         </ReviewRow>
         {data.hasBalance && (
@@ -463,23 +525,16 @@ export function ReviewStep({
           <span className="text-xl font-semibold tabular-nums">{formatBRL(loss)}</span>
           <span className="block text-xs font-normal text-muted">Estimativa baseada nos valores informados.</span>
         </ReviewRow>
-        <ReviewRow label="Documentos enviados" onEdit={() => goTo("documents")}>
-          {fileCount === null ? <span className="font-normal text-muted">Carregando…</span> : plural(fileCount, "arquivo", "arquivos")}
-        </ReviewRow>
         <ReviewRow label="Compromisso voluntário">
           <Accepted>Aceito</Accepted>
         </ReviewRow>
         <ReviewRow label="Tratamento de dados">
           <Accepted>Autorizado</Accepted>
         </ReviewRow>
-        <ReviewRow label="Contato" onEdit={() => goTo("contact")}>
-          <span className="block">{data.fullName}</span>
-          <span className="block font-normal text-ink-soft">{data.email}</span>
-          <span className="block font-normal text-ink-soft">{data.whatsapp}</span>
-        </ReviewRow>
       </dl>
       <p className="mt-4 text-sm leading-relaxed text-muted">
-        Cada caso é analisado individualmente. O envio das informações não garante recuperação de valores. Ao enviar, você concorda com os{" "}
+        Cada caso é analisado individualmente. A análise não garante recuperação, restituição ou recebimento de valores. Ao enviar, você
+        concorda com os{" "}
         <Link href="/termos" target="_blank" className="font-medium text-navy-700 underline underline-offset-2">
           Termos de Uso
         </Link>

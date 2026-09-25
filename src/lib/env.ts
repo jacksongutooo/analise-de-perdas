@@ -1,4 +1,5 @@
 // Configuração lida das variáveis de ambiente (uso exclusivo no servidor).
+import { parseMoneyToCents } from "./format";
 
 function bool(value: string | undefined): boolean {
   return ["1", "true", "yes", "on"].includes((value ?? "").trim().toLowerCase());
@@ -8,6 +9,22 @@ function int(value: string | undefined, fallback: number, min: number, max: numb
   const n = Number.parseInt(value ?? "", 10);
   if (!Number.isFinite(n)) return fallback;
   return Math.min(max, Math.max(min, n));
+}
+
+function price(value: string | undefined): number | null {
+  const cents = parseMoneyToCents((value ?? "").trim());
+  return cents !== null && cents > 0 ? cents : null;
+}
+
+function httpsUrl(value: string | undefined): string | null {
+  const raw = (value ?? "").trim();
+  if (!raw) return null;
+  try {
+    const url = new URL(raw.replace(/\{protocolo\}/g, "PROTOCOLO"));
+    return url.protocol === "https:" || (url.protocol === "http:" && process.env.NODE_ENV !== "production") ? raw : null;
+  } catch {
+    return null;
+  }
 }
 
 export const config = {
@@ -28,6 +45,12 @@ export const config = {
   },
   cronSecret: process.env.CRON_SECRET ?? "",
   isProduction: process.env.NODE_ENV === "production",
+  /** Ano de referência do ComprovaBet exigido no envio (documento anual). */
+  comprovabetYear: int(process.env.COMPROVABET_YEAR, 2025, 2020, 2100),
+  /** Valor da análise exibido na etapa de pagamento (opcional). */
+  analysisPriceCents: price(process.env.ANALYSIS_PRICE),
+  /** Link de pagamento externo (opcional). "{protocolo}" é trocado pelo protocolo do caso. */
+  paymentUrl: httpsUrl(process.env.PAYMENT_URL),
 };
 
 export function maxUploadBytes(): number {
@@ -40,4 +63,9 @@ export function authSecret(): string {
     throw new Error("AUTH_SECRET ausente ou curto demais (mínimo de 32 caracteres). Configure o arquivo .env.");
   }
   return secret;
+}
+
+/** Link de pagamento do caso, quando configurado. */
+export function paymentLinkFor(protocol: string): string | null {
+  return config.paymentUrl ? config.paymentUrl.replace(/\{protocolo\}/g, encodeURIComponent(protocol)) : null;
 }

@@ -94,7 +94,8 @@ export async function processDocument(documentId: string): Promise<void> {
   const doc = await prisma.document.findUnique({ where: { id: documentId } });
   if (!doc?.caseId) return;
   const caseId = doc.caseId;
-  const flagManual = doc.status === "pending" ? { status: "manual_review" as const } : {};
+  // O ComprovaBet é sempre aprovado pela equipe; a leitura de movimentações não muda o status dele.
+  const flagManual = doc.status === "pending" && doc.category !== "comprovabet" ? { status: "manual_review" as const } : {};
 
   if (doc.mimeType.startsWith("image/")) {
     await prisma.document.update({ where: { id: doc.id }, data: { extractionStatus: "unsupported", ...flagManual } });

@@ -89,6 +89,7 @@ export const SITUATIONS: Option<SituationValue>[] = [
 ];
 
 export const DOC_CATEGORY_VALUES = [
+  "comprovabet",
   "financial_history",
   "deposit_history",
   "withdrawal_history",
@@ -99,6 +100,7 @@ export const DOC_CATEGORY_VALUES = [
 ] as const;
 export type DocCategoryValue = (typeof DOC_CATEGORY_VALUES)[number];
 export const DOC_CATEGORIES: (Option<DocCategoryValue> & { short: string })[] = [
+  { value: "comprovabet", label: "ComprovaBet anual", short: "ComprovaBet" },
   { value: "financial_history", label: "Histórico financeiro completo", short: "Histórico completo" },
   { value: "deposit_history", label: "Histórico de depósitos", short: "Depósitos" },
   { value: "withdrawal_history", label: "Histórico de saques", short: "Saques" },
@@ -107,26 +109,49 @@ export const DOC_CATEGORIES: (Option<DocCategoryValue> & { short: string })[] = 
   { value: "pix_receipt", label: "Comprovante PIX", short: "Comprovante PIX" },
   { value: "other", label: "Outro documento", short: "Outro" },
 ];
-/** Na solicitação inicial pedimos apenas documentos das próprias plataformas. */
-export const INITIAL_DOC_CATEGORY_VALUES = ["financial_history", "deposit_history", "withdrawal_history", "bet_history"] as const;
+/** Na solicitação inicial o documento principal é o ComprovaBet anual. Outros tipos só como complemento. */
+export const INITIAL_DOC_CATEGORY_VALUES = ["comprovabet"] as const;
 export type InitialDocCategory = (typeof INITIAL_DOC_CATEGORY_VALUES)[number];
 
 export const REQUEST_REASON_VALUES = [
+  "illegible_file",
+  "cut_document",
+  "cpf_mismatch",
+  "wrong_period",
+  "not_comprovabet",
+  "incomplete_document",
+  "insufficient_data",
   "incomplete_history",
   "divergent_values",
-  "illegible_file",
   "missing_withdrawals",
   "missing_deposits",
   "other",
 ] as const;
 export type RequestReasonValue = (typeof REQUEST_REASON_VALUES)[number];
 export const REQUEST_REASONS: Option<RequestReasonValue>[] = [
+  { value: "illegible_file", label: "Arquivo ilegível" },
+  { value: "cut_document", label: "Documento cortado" },
+  { value: "cpf_mismatch", label: "Documento de outro CPF" },
+  { value: "wrong_period", label: "Período diferente do solicitado" },
+  { value: "not_comprovabet", label: "O arquivo não é um ComprovaBet" },
+  { value: "incomplete_document", label: "Documento incompleto" },
+  { value: "insufficient_data", label: "Dados insuficientes para a análise" },
   { value: "incomplete_history", label: "Histórico incompleto" },
   { value: "divergent_values", label: "Valores divergentes" },
-  { value: "illegible_file", label: "Arquivo ilegível" },
   { value: "missing_withdrawals", label: "Falta histórico de saques" },
   { value: "missing_deposits", label: "Falta histórico de depósitos" },
   { value: "other", label: "Outro" },
+];
+/** Motivos ligados ao ComprovaBet (aparecem primeiro nas ações rápidas do painel). */
+export const COMPROVABET_REASON_VALUES: RequestReasonValue[] = [
+  "illegible_file",
+  "cut_document",
+  "cpf_mismatch",
+  "wrong_period",
+  "not_comprovabet",
+  "incomplete_document",
+  "insufficient_data",
+  "other",
 ];
 
 export const COMMITMENT_VERSION = "2026-09-v1";

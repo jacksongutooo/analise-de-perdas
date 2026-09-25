@@ -1,9 +1,19 @@
 import type { Prisma } from "@prisma/client";
+import { cpfDigits, maskCpf } from "@/lib/cpf";
 import { prisma } from "@/lib/db";
 import { config } from "@/lib/env";
 import { centsToDecimal, decimalToCents, parseMoneyToCents } from "@/lib/format";
 import { BET_TYPE_VALUES, type BetTypeValue } from "@/lib/options";
-import { STATUS_GROUPS, isCaseStatus, type CaseStatusValue, type StatusGroup } from "@/lib/status";
+import {
+  PAYMENT_STATUS_VALUES,
+  STATUS_GROUPS,
+  isCaseStatus,
+  type CaseStatusValue,
+  type CpfCheckValue,
+  type DocumentStatusValue,
+  type PaymentStatusValue,
+  type StatusGroup,
+} from "@/lib/status";
 
 export const PAGE_SIZE = 20;
 
@@ -17,6 +27,7 @@ export type CaseFilters = {
   to: string;
   min: string;
   max: string;
+  payment: string;
   page: number;
 };
 
@@ -35,6 +46,7 @@ export function parseCaseFilters(sp: Record<string, string | string[] | undefine
     to: get("to"),
     min: get("min"),
     max: get("max"),
+    payment: get("payment"),
     page: Math.max(1, Number.parseInt(get("page") || "1", 10) || 1),
   };
 }
@@ -56,6 +68,7 @@ export function buildCaseWhere(f: CaseFilters): Prisma.CaseWhereInput {
     if (group in STATUS_GROUPS) and.push({ status: { in: [...STATUS_GROUPS[group]] as CaseStatusValue[] } });
   }
   if ((BET_TYPE_VALUES as readonly string[]).includes(f.type)) and.push({ betType: f.type as BetTypeValue });
+  if ((PAYMENT_STATUS_VALUES as readonly string[]).includes(f.payment)) and.push({ paymentStatus: f.payment as PaymentStatusValue });
   if (f.platform) and.push({ platforms: { some: { platformId: f.platform } } });
   if (f.admin === "none") and.push({ assignedAdminId: null });
   else if (f.admin) and.push({ assignedAdminId: f.admin });
@@ -73,13 +86,19 @@ export function buildCaseWhere(f: CaseFilters): Prisma.CaseWhereInput {
     });
   }
   if (f.q) {
-    and.push({
-      OR: [
-        { protocol: { contains: f.q, mode: "insensitive" } },
-        { user: { fullName: { contains: f.q, mode: "insensitive" } } },
-        { user: { email: { contains: f.q, mode: "insensitive" } } },
-      ],
-    });
+    // CPF completo (com ou sem pontuação) busca pelo CPF exato; o resto busca protocolo, nome e e-mail.
+    const digits = cpfDigits(f.q);
+    if (digits.length === 11 && /^[\d.\-\s]+$/.test(f.q)) {
+      and.push({ user: { cpf: digits } });
+    } else {
+      and.push({
+        OR: [
+          { protocol: { contains: f.q, mode: "insensitive" } },
+          { user: { fullName: { contains: f.q, mode: "insensitive" } } },
+          { user: { email: { contains: f.q, mode: "insensitive" } } },
+        ],
+      });
+    }
   }
   return { AND: and };
 }
@@ -99,12 +118,19 @@ export async function listCases(f: CaseFilters) {
         createdAt: true,
         betType: true,
         status: true,
+        paymentStatus: true,
         declaredLoss: true,
         identifiedLoss: true,
         identifiedSource: true,
-        user: { select: { fullName: true } },
+        user: { select: { fullName: true, cpf: true } },
         assignedAdmin: { select: { name: true } },
         platforms: { select: { platform: { select: { name: true } } } },
+        documents: {
+          where: { category: "comprovabet" },
+          orderBy: { createdAt: "desc" },
+          take: 1,
+          select: { status: true, cpfCheck: true },
+        },
       },
     }),
   ]);
@@ -117,7 +143,11 @@ export async function listCases(f: CaseFilters) {
       createdAt: r.createdAt,
       betType: r.betType as BetTypeValue,
       status: r.status as CaseStatusValue,
+      paymentStatus: r.paymentStatus as PaymentStatusValue,
       name: r.user.fullName,
+      cpfMasked: r.user.cpf ? maskCpf(r.user.cpf) : null,
+      docStatus: (r.documents[0]?.status ?? null) as DocumentStatusValue | null,
+      docCpfCheck: (r.documents[0]?.cpfCheck ?? null) as CpfCheckValue | null,
       platforms: r.platforms.map((p) => p.platform.name),
       declaredLossCents: decimalToCents(r.declaredLoss) ?? 0,
       identifiedLossCents: decimalToCents(r.identifiedLoss),
@@ -177,8 +207,9 @@ export async function getDashboard() {
     total,
     groups: {
       new: statusCount(STATUS_GROUPS.new),
-      review: statusCount(STATUS_GROUPS.review),
       waiting: statusCount(STATUS_GROUPS.waiting),
+      payment: statusCount(STATUS_GROUPS.payment),
+      review: statusCount(STATUS_GROUPS.review),
       done: statusCount(STATUS_GROUPS.done),
     },
     declaredTotalCents: decimalToCents(totals._sum.declaredLoss) ?? 0,

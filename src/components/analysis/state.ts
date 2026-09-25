@@ -1,4 +1,5 @@
 // Estado do formulário em etapas: telas, validação por etapa, cálculo e salvamento automático.
+import { isValidCpf } from "@/lib/cpf";
 import { isValidEmail, normalizePhoneBR } from "@/lib/format";
 import { PLATFORMS, type BetTypeValue, type PeriodValue, type SituationValue } from "@/lib/options";
 
@@ -17,7 +18,10 @@ export type Screen =
 
 export const TOTAL_STEPS = 7;
 
-/** Cada etapa numerada tem no máximo 1 ou 2 perguntas; algumas ocupam duas telas curtas. */
+/**
+ * Cada etapa numerada tem no máximo 1 ou 2 perguntas; algumas ocupam duas telas curtas.
+ * Os dados do solicitante (com o CPF) vêm antes do ComprovaBet: o documento é conferido com esse CPF.
+ */
 export const SCREENS: { id: Screen; step: number | null; label?: string }[] = [
   { id: "type", step: 1 },
   { id: "typeDetail", step: 1 },
@@ -26,9 +30,9 @@ export const SCREENS: { id: Screen; step: number | null; label?: string }[] = [
   { id: "amounts", step: 4 },
   { id: "balance", step: 4 },
   { id: "situation", step: 5 },
-  { id: "documents", step: 6 },
-  { id: "commitment", step: 7 },
-  { id: "contact", step: null, label: "Último passo" },
+  { id: "contact", step: 6 },
+  { id: "documents", step: 7 },
+  { id: "commitment", step: null, label: "Último passo" },
   { id: "review", step: null, label: "Revisão" },
 ];
 
@@ -50,6 +54,10 @@ export type WizardData = {
   privacyConsent: boolean;
   commitment: boolean;
   fullName: string;
+  /** CPF digitado (somente dígitos). Fica só na memória: nunca vai para o salvamento automático. */
+  cpf: string;
+  /** CPF já registrado no rascunho do servidor, na versão mascarada (***.***.***-00). */
+  cpfMasked: string | null;
   email: string;
   whatsapp: string;
   isAdult: boolean;
@@ -73,13 +81,23 @@ export const EMPTY_DATA: WizardData = {
   privacyConsent: false,
   commitment: false,
   fullName: "",
+  cpf: "",
+  cpfMasked: null,
   email: "",
   whatsapp: "",
   isAdult: false,
 };
 
 export type DraftCreds = { id: string; token: string };
-export type DraftFile = { id: string; name: string; size: number; platform: string | null; category: string; createdAt: string };
+export type DraftFile = {
+  id: string;
+  name: string;
+  size: number;
+  platform: string | null;
+  category: string;
+  createdAt: string;
+  manualCheck?: boolean;
+};
 
 export function draftHeaders(creds: DraftCreds): Record<string, string> {
   return { "x-draft-id": creds.id, "x-draft-token": creds.token };
@@ -104,7 +122,12 @@ export function selectedPlatformNames(d: WizardData): string[] {
 
 export function attachedFiles(files: DraftFile[], names: string[]): DraftFile[] {
   const lower = new Set(names.map((n) => n.toLowerCase()));
-  return files.filter((f) => f.platform && lower.has(f.platform.toLowerCase()));
+  return files.filter((f) => f.category !== "comprovabet" && f.platform && lower.has(f.platform.toLowerCase()));
+}
+
+/** Arquivos do ComprovaBet já enviados no rascunho. */
+export function comprovabetFiles(files: DraftFile[]): DraftFile[] {
+  return files.filter((f) => f.category === "comprovabet");
 }
 
 /** Perda declarada = depósitos − saques − saldo disponível (negativo vira zero e é sinalizado). */
@@ -113,12 +136,14 @@ export function declaredLoss(d: WizardData): { raw: number; loss: number; needsR
   return { raw, loss: Math.max(0, raw), needsReview: raw < 0 };
 }
 
-export type ContactErrors = Partial<Record<"fullName" | "email" | "whatsapp" | "isAdult", string>>;
+export type ContactErrors = Partial<Record<"fullName" | "cpf" | "email" | "whatsapp" | "isAdult", string>>;
 
 export function contactErrors(d: WizardData): ContactErrors {
   const errors: ContactErrors = {};
   const name = d.fullName.trim();
   if (name.length < 5 || name.split(/\s+/).length < 2) errors.fullName = "Informe seu nome completo.";
+  if (!d.cpf && !d.cpfMasked) errors.cpf = "Informe seu CPF.";
+  else if (d.cpf && !isValidCpf(d.cpf)) errors.cpf = "CPF inválido. Confira os números.";
   if (!isValidEmail(d.email)) errors.email = "Informe um e-mail válido.";
   if (!normalizePhoneBR(d.whatsapp)) errors.whatsapp = "Informe um WhatsApp válido com DDD.";
   if (!d.isAdult) errors.isAdult = "O serviço é exclusivo para maiores de 18 anos.";
@@ -150,7 +175,7 @@ export function screenError(screen: Screen, d: WizardData, ctx: { fileCount: num
     case "documents":
       if (!d.privacyConsent) return "Para enviar documentos, marque a autorização de tratamento dos dados.";
       if (ctx.busy) return "Aguarde o envio dos arquivos terminar.";
-      return ctx.fileCount > 0 ? null : "Envie ao menos um documento de uma das plataformas.";
+      return ctx.fileCount > 0 ? null : "Envie o seu ComprovaBet para continuar.";
     case "commitment":
       return d.commitment ? null : "Marque o compromisso para continuar.";
     case "contact":
@@ -179,6 +204,7 @@ export const FIELD_SCREEN: Record<string, Screen> = {
   documents: "documents",
   commitment: "commitment",
   fullName: "contact",
+  cpf: "contact",
   email: "contact",
   whatsapp: "contact",
   isAdult: "contact",
@@ -221,7 +247,8 @@ export function loadProgress(): SavedProgress | null {
     const parsed = JSON.parse(raw) as Partial<SavedProgress>;
     if (parsed.v !== 1 || !parsed.data || !SCREENS.some((s) => s.id === parsed.screen)) return null;
     const draft = parsed.draft && typeof parsed.draft.id === "string" && typeof parsed.draft.token === "string" ? parsed.draft : null;
-    return { v: 1, screen: parsed.screen as Screen, data: { ...EMPTY_DATA, ...parsed.data }, draft, savedAt: Number(parsed.savedAt) || Date.now() };
+    const data = { ...EMPTY_DATA, ...parsed.data, cpf: "" };
+    return { v: 1, screen: parsed.screen as Screen, data, draft, savedAt: Number(parsed.savedAt) || Date.now() };
   } catch {
     return null;
   }
@@ -229,7 +256,9 @@ export function loadProgress(): SavedProgress | null {
 
 export function saveProgress(progress: SavedProgress): boolean {
   try {
-    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(progress));
+    // O CPF completo nunca é salvo no navegador; fica só a versão mascarada vinda do servidor.
+    const safe: SavedProgress = { ...progress, data: { ...progress.data, cpf: "" } };
+    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(safe));
     return true;
   } catch {
     return false;

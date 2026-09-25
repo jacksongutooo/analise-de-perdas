@@ -13,9 +13,9 @@ import {
   FIELD_SCREEN,
   SCREENS,
   TOTAL_STEPS,
-  attachedFiles,
   buildPayload,
   clearProgress,
+  comprovabetFiles,
   draftHeaders,
   loadProgress,
   resumeScreen,
@@ -40,7 +40,7 @@ import {
   TypeStep,
 } from "./steps";
 
-export type WizardSettings = { maxUploadMb: number; reviewDays: number };
+export type WizardSettings = { maxUploadMb: number; reviewDays: number; comprovabetYear: number };
 
 export function AnalysisWizard({ settings }: { settings: WizardSettings }) {
   const router = useRouter();
@@ -57,6 +57,8 @@ export function AnalysisWizard({ settings }: { settings: WizardSettings }) {
   const [notice, setNotice] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [filesLoading, setFilesLoading] = useState(false);
+  const [savingCpf, setSavingCpf] = useState(false);
+  const [cpfServerError, setCpfServerError] = useState<string | null>(null);
 
   const draftRef = useRef<DraftCreds | null>(null);
   const restoredDraftId = useRef<string | null>(null);
@@ -110,7 +112,9 @@ export function AnalysisWizard({ settings }: { settings: WizardSettings }) {
     setDraft(null);
     draftPromise.current = null;
     setFiles([]);
-    setNotice("Sua sessão de envio anterior expirou. Envie os arquivos novamente.");
+    // O CPF ficava registrado no rascunho expirado: precisa ser informado de novo.
+    setData((current) => ({ ...current, cpfMasked: null }));
+    setNotice("Sua sessão de envio anterior expirou. Confira seu CPF e envie o ComprovaBet novamente.");
   }, [setDraft]);
 
   // Ao retomar um preenchimento salvo, busca os arquivos já enviados (ex.: ao voltar outro dia).
@@ -128,11 +132,12 @@ export function AnalysisWizard({ settings }: { settings: WizardSettings }) {
       .then(async (res) => {
         if (cancelled) return;
         if (res.ok) {
-          const body = (await res.json()) as { files?: DraftFile[] };
+          const body = (await res.json()) as { files?: DraftFile[]; cpfMasked?: string | null };
           setFiles((current) => {
             const known = new Set(current.map((f) => f.id));
             return [...current, ...(body.files ?? []).filter((f) => !known.has(f.id))];
           });
+          setData((current) => ({ ...current, cpfMasked: body.cpfMasked ?? null }));
         } else if (res.status === 401) {
           invalidateDraft();
         }
@@ -179,12 +184,14 @@ export function AnalysisWizard({ settings }: { settings: WizardSettings }) {
   const index = Math.max(0, SCREENS.findIndex((s) => s.id === screen));
   const meta = SCREENS[index] ?? SCREENS[0]!;
   const platformNames = useMemo(() => selectedPlatformNames(data), [data]);
-  const attached = useMemo(() => attachedFiles(files, platformNames), [files, platformNames]);
+  const sentComprovaBet = useMemo(() => comprovabetFiles(files), [files]);
+  const year = settings.comprovabetYear;
   const progress = Math.round(((index + 1) / SCREENS.length) * 100);
 
   const goTo = useCallback((target: Screen) => {
     if (advanceTimer.current) window.clearTimeout(advanceTimer.current);
     setError(null);
+    setCpfServerError(null);
     setAttempted(false);
     setResumed(false);
     setScreen(target);
@@ -198,6 +205,7 @@ export function AnalysisWizard({ settings }: { settings: WizardSettings }) {
   const update = useCallback((patch: Partial<WizardData>) => {
     setData((current) => ({ ...current, ...patch }));
     setError(null);
+    if ("cpf" in patch) setCpfServerError(null);
   }, []);
 
   const advanceFrom = (from: Screen) => {
@@ -215,7 +223,7 @@ export function AnalysisWizard({ settings }: { settings: WizardSettings }) {
   };
 
   async function submit() {
-    const ctx = { fileCount: attached.length, busy };
+    const ctx = { fileCount: sentComprovaBet.length, busy };
     const invalid = SCREENS.find((s) => s.id !== "review" && screenError(s.id, data, ctx));
     if (invalid) {
       goTo(invalid.id);
@@ -250,6 +258,7 @@ export function AnalysisWizard({ settings }: { settings: WizardSettings }) {
         goTo("documents");
       } else {
         const target = body.field ? FIELD_SCREEN[body.field.split(".")[0] ?? ""] : undefined;
+        if (body.field === "cpf") update({ cpfMasked: null });
         if (target) {
           goTo(target);
           setAttempted(true);
@@ -263,9 +272,43 @@ export function AnalysisWizard({ settings }: { settings: WizardSettings }) {
     }
   }
 
+  /** Registra o CPF no rascunho (o ComprovaBet é conferido com ele) e segue para o documento. */
+  async function saveCpfAndContinue(target: Screen) {
+    setSavingCpf(true);
+    setError(null);
+    try {
+      for (let attempt = 0; attempt < 2; attempt++) {
+        const creds = await ensureDraft();
+        const res = await fetch("/api/draft", {
+          method: "PUT",
+          headers: { "Content-Type": "application/json", ...draftHeaders(creds) },
+          body: JSON.stringify({ cpf: data.cpf }),
+        });
+        const body = (await res.json().catch(() => ({}))) as { cpfMasked?: string; error?: string };
+        if (res.ok && body.cpfMasked) {
+          update({ cpfMasked: body.cpfMasked, cpf: "" });
+          goTo(target);
+          return;
+        }
+        if (res.status === 401 && attempt === 0) {
+          invalidateDraft();
+          continue;
+        }
+        setAttempted(true);
+        setCpfServerError(body.error ?? "Não foi possível registrar o CPF. Tente novamente.");
+        return;
+      }
+    } catch (err) {
+      setError(err instanceof Error && err.message ? err.message : "Sem conexão. Verifique sua internet e tente novamente.");
+    } finally {
+      setSavingCpf(false);
+    }
+  }
+
   function next() {
+    if (savingCpf) return;
     if (filesLoading && (screen === "documents" || screen === "review")) return;
-    const message = screenError(screen, data, { fileCount: attached.length, busy });
+    const message = screenError(screen, data, { fileCount: sentComprovaBet.length, busy });
     if (message) {
       setError(message);
       setAttempted(true);
@@ -276,8 +319,22 @@ export function AnalysisWizard({ settings }: { settings: WizardSettings }) {
       return;
     }
     const target = SCREENS[index + 1];
+    if (screen === "contact" && data.cpf && target) {
+      void saveCpfAndContinue(target.id);
+      return;
+    }
     if (target) goTo(target.id);
   }
+
+  const cpfMissing = useCallback(
+    (message: string) => {
+      setData((current) => ({ ...current, cpfMasked: null }));
+      goTo("contact");
+      setAttempted(true);
+      setCpfServerError(message);
+    },
+    [goTo],
+  );
 
   function back() {
     const previous = SCREENS[index - 1];
@@ -308,9 +365,9 @@ export function AnalysisWizard({ settings }: { settings: WizardSettings }) {
       case "platforms":
         return <PlatformsStep {...common} />;
       case "period":
-        return <PeriodStep {...common} />;
+        return <PeriodStep {...common} year={year} />;
       case "amounts":
-        return <AmountsStep {...common} />;
+        return <AmountsStep {...common} year={year} />;
       case "balance":
         return <BalanceStep {...common} />;
       case "situation":
@@ -319,12 +376,13 @@ export function AnalysisWizard({ settings }: { settings: WizardSettings }) {
         return (
           <DocumentsStep
             {...common}
-            platformNames={platformNames}
+            year={year}
             files={files}
             setFiles={setFiles}
             ensureDraft={ensureDraft}
             getDraft={getDraft}
             onDraftInvalid={invalidateDraft}
+            onCpfMissing={cpfMissing}
             setBusy={setBusy}
             maxUploadMb={settings.maxUploadMb}
             notice={notice}
@@ -334,14 +392,15 @@ export function AnalysisWizard({ settings }: { settings: WizardSettings }) {
       case "commitment":
         return <CommitmentStep {...common} reviewDays={settings.reviewDays} />;
       case "contact":
-        return <ContactStep {...common} showErrors={attempted} />;
+        return <ContactStep {...common} showErrors={attempted} cpfLocked={sentComprovaBet.length > 0} serverError={cpfServerError} />;
       case "review":
         return (
           <ReviewStep
             data={data}
             headingRef={headingRef}
             platformNames={platformNames}
-            fileCount={filesLoading ? null : attached.length}
+            fileCount={filesLoading ? null : sentComprovaBet.length}
+            year={year}
             goTo={goTo}
           />
         );
@@ -417,14 +476,14 @@ export function AnalysisWizard({ settings }: { settings: WizardSettings }) {
 
       <div className="fixed inset-x-0 bottom-0 z-20 border-t border-line bg-surface/95 pb-[env(safe-area-inset-bottom)] backdrop-blur-md">
         <div className="mx-auto flex max-w-xl gap-3 px-5 py-3">
-          <Button variant="secondary" onClick={back} className="w-[7.5rem] shrink-0" disabled={!ready || submitting}>
+          <Button variant="secondary" onClick={back} className="w-[7.5rem] shrink-0" disabled={!ready || submitting || savingCpf}>
             Voltar
           </Button>
           <Button
             onClick={next}
             className="flex-1"
             disabled={!ready}
-            loading={submitting || (filesLoading && (screen === "documents" || screen === "review"))}
+            loading={submitting || savingCpf || (filesLoading && (screen === "documents" || screen === "review"))}
           >
             {screen === "review" ? "Solicitar análise" : "Continuar"}
           </Button>

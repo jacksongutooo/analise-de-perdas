@@ -12,7 +12,7 @@ const plex = IBM_Plex_Sans({
   display: "swap",
 });
 
-const DESCRIPTION = `Envie suas informações e os históricos das plataformas de apostas para análise individual do seu caso. 100% online, com retorno em até ${config.reviewDays} dias.`;
+const DESCRIPTION = `Envie seu ComprovaBet ${config.comprovabetYear} para uma análise documental individual do seu caso, com acompanhamento em todas as etapas. 100% online.`;
 
 export const metadata: Metadata = {
   metadataBase: new URL(site.url),

@@ -2,21 +2,26 @@ import { headers } from "next/headers";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import type { ReactNode } from "react";
-import { IconAlert, IconChevronLeft, IconEye, IconRefresh } from "@/components/icons";
+import { ConfirmDialog } from "@/components/admin/ConfirmDialog";
+import { RevealCpf } from "@/components/admin/RevealCpf";
+import { IconAlert, IconCheck, IconChevronLeft, IconEye, IconRefresh } from "@/components/icons";
 import { MoneyField } from "@/components/MoneyInput";
 import { SubmitButton } from "@/components/SubmitButton";
-import { Badge, Notice, Select, Textarea, buttonClasses } from "@/components/ui";
+import { Badge, Notice, Select, TextInput, Textarea, buttonClasses } from "@/components/ui";
 import { logAccess } from "@/lib/audit";
 import { requireAdmin } from "@/lib/auth/admin";
 import { demoScope } from "@/lib/cases/admin-queries";
+import { CPF_MISMATCH_MESSAGE, SERVICE_TERMS_VERSION } from "@/lib/comprovabet";
+import { maskCpf } from "@/lib/cpf";
 import { cx } from "@/lib/cx";
 import { prisma } from "@/lib/db";
 import { config } from "@/lib/env";
 import type { ExtractionSummary } from "@/lib/extraction/process";
-import { decimalToCents, formatBRL, formatBytes, formatDate, formatDateTime, formatPhoneBR } from "@/lib/format";
+import { decimalToCents, formatBRL, formatBytes, formatDate, formatDateTime, formatPhoneBR, plural } from "@/lib/format";
 import {
   BET_TYPE_SUMMARY,
   CASINO_GAMES,
+  COMPROVABET_REASON_VALUES,
   DOC_CATEGORIES,
   MAIN_LOSS_AREAS,
   PERIODS,
@@ -30,26 +35,43 @@ import {
   ADMIN_SETTABLE_STATUSES,
   CASE_STATUS_LABEL,
   CASE_STATUS_TONE,
+  CPF_CHECK_LABEL,
+  CPF_CHECK_TONE,
+  CPF_LOCKED_STATUSES,
   DOCUMENT_STATUS_LABEL,
   DOCUMENT_STATUS_TONE,
   DOCUMENT_STATUS_VALUES,
+  PAYMENT_STATUS_LABEL,
+  PAYMENT_STATUS_TONE,
   divergenceOf,
   type CaseStatusValue,
+  type CpfCheckValue,
   type DocumentStatusValue,
+  type PaymentStatusValue,
 } from "@/lib/status";
 import {
   addNote,
+  approveDocument,
   assignCase,
   clearValidated,
+  concludeAnalysis,
+  confirmCpfManually,
   confirmIdentified,
+  confirmPayment,
+  correctCpf,
   deleteCase,
+  markCpfMismatch,
+  markDocumentInvalid,
   recalcIdentified,
   reprocessDocument,
+  requestComplement,
   requestDocuments,
+  revealCpf,
   saveIdentified,
   saveNextSteps,
   saveValidated,
   setDocumentStatus,
+  startAnalysis,
   updateStatus,
 } from "./actions";
 
@@ -68,6 +90,15 @@ const OK_MESSAGES: Record<string, string> = {
   validated: "Valor validado salvo.",
   validated_clear: "Valor validado removido.",
   next: "Próximos passos salvos.",
+  approved: "Documento aprovado. O cliente vê “Documento analisado” e o caso segue para o pagamento.",
+  cpf_mismatch: "CPF divergente registrado. O cliente foi orientado a enviar o documento correto.",
+  complement: "Complementação solicitada. O cliente vê a observação no acompanhamento.",
+  invalid: "Documento marcado como inválido e complementação solicitada ao cliente.",
+  cpf_manual: "CPF conferido manualmente.",
+  payment: "Pagamento confirmado. O prazo estimado da análise passou a contar agora.",
+  started: "Análise iniciada. O cliente vê “Análise em andamento”.",
+  concluded: "Análise concluída.",
+  cpf_corrected: "CPF corrigido e ComprovaBet reconferido.",
 };
 const ERROR_MESSAGES: Record<string, string> = {
   status: "Status inválido.",
@@ -79,6 +110,17 @@ const ERROR_MESSAGES: Record<string, string> = {
   value: "Informe um valor válido.",
   role: "Somente administradores podem excluir casos.",
   confirm: "O protocolo digitado não confere. Nada foi excluído.",
+  message: "Escreva a observação para o cliente explicando o que precisa ser enviado.",
+  cpf_block: "CPF divergente: o documento não pode ser aprovado. Se a leitura automática estiver errada, faça a conferência manual do CPF.",
+  cpf_confirm: "Para aprovar o ComprovaBet, confirme que conferiu o CPF do documento.",
+  cpf_note: "Explique a conferência manual: a leitura automática havia encontrado CPF divergente.",
+  payment: "O pagamento só pode ser confirmado depois da aprovação do documento (etapa “Aguardando pagamento”).",
+  start: "A análise começa depois da validação documental e do pagamento confirmado.",
+  conclude: "Só é possível concluir uma análise em andamento.",
+  role_cpf: "Somente administradores podem corrigir o CPF.",
+  cpf_invalid: "CPF inválido. Nada foi alterado.",
+  cpf_reason: "Informe o motivo da correção do CPF.",
+  cpf_locked: "O CPF não pode mais ser alterado: a análise documental já avançou.",
 };
 
 function Section({ id, title, children, aside }: { id: string; title: string; children: ReactNode; aside?: ReactNode }) {
@@ -114,6 +156,124 @@ function ValueCard({ label, value, note, highlight }: { label: string; value: Re
 
 const categoryLabel = (value: string) => DOC_CATEGORIES.find((c) => c.value === value)?.label ?? value;
 
+function ReasonChoices({ defaults = [] }: { defaults?: string[] }) {
+  return (
+    <fieldset>
+      <legend className="text-sm font-medium text-ink">Motivo</legend>
+      <div className="mt-2 grid gap-2">
+        {COMPROVABET_REASON_VALUES.map((value) => (
+          <label key={value} className="flex items-center gap-2 text-sm text-ink">
+            <input type="checkbox" name="reasons" value={value} defaultChecked={defaults.includes(value)} className="size-4 accent-navy-900" />
+            {labelFor(REQUEST_REASONS, value)}
+          </label>
+        ))}
+      </div>
+    </fieldset>
+  );
+}
+
+function ClientMessage({ defaultValue }: { defaultValue?: string }) {
+  return (
+    <label className="block text-sm font-medium text-ink">
+      Observação para o cliente
+      <span className="block text-xs font-normal text-muted">Explique exatamente o que precisa ser enviado. Aparece no acompanhamento do cliente.</span>
+      <Textarea name="message" required maxLength={1000} defaultValue={defaultValue} className="mt-1.5 min-h-24 text-sm" />
+    </label>
+  );
+}
+
+type ComprovaBetDoc = { id: string; status: string; cpfCheck: string | null };
+
+/** Ações rápidas sobre um ComprovaBet, todas com diálogo de confirmação. */
+function ComprovaBetActions({
+  doc,
+  caseId,
+  cpfMasked,
+}: {
+  doc: ComprovaBetDoc;
+  caseId: string;
+  cpfMasked: string;
+}) {
+  const hidden = { documentId: doc.id };
+  const cpfConfirmed = doc.cpfCheck === "match" || doc.cpfCheck === "manual_match";
+  return (
+    <>
+      <ConfirmDialog
+        label="Aprovar documento"
+        icon={<IconCheck size={15} strokeWidth={2.5} />}
+        variant="ok"
+        disabled={doc.status === "valid" || doc.cpfCheck === "mismatch"}
+        disabledReason={doc.status === "valid" ? "Documento já aprovado." : "CPF divergente: faça a conferência manual antes de aprovar."}
+        title="Aprovar o ComprovaBet?"
+        confirmLabel="Aprovar documento"
+        confirmVariant="ok"
+        action={approveDocument.bind(null, caseId)}
+        hidden={hidden}
+        description={
+          <>
+            <p>O cliente verá “Documento analisado” e o caso segue para o pagamento da análise.</p>
+            {doc.cpfCheck === "match" && <p className="font-medium text-ok-700">Leitura automática: CPF compatível.</p>}
+          </>
+        }
+      >
+        {!cpfConfirmed && (
+          <label className="flex items-start gap-2.5 rounded-xl border border-warn-700/25 bg-warn-50 p-3 text-sm text-ink">
+            <input type="checkbox" name="confirmCpf" value="yes" required className="mt-0.5 size-4 shrink-0 accent-navy-900" />
+            <span>
+              Conferi manualmente que o CPF do documento corresponde ao CPF cadastrado ({cpfMasked}).
+            </span>
+          </label>
+        )}
+        <label className="block text-sm font-medium text-ink">
+          Observação interna (opcional)
+          <Textarea name="note" maxLength={500} className="mt-1.5 min-h-16 text-sm" />
+        </label>
+      </ConfirmDialog>
+      <ConfirmDialog
+        label="CPF divergente"
+        variant="danger"
+        disabled={doc.status === "cpf_mismatch"}
+        disabledReason="CPF divergente já registrado."
+        title="Registrar CPF divergente?"
+        confirmLabel="Registrar e avisar o cliente"
+        confirmVariant="danger"
+        action={markCpfMismatch.bind(null, caseId)}
+        hidden={{ ...hidden, reasons: "cpf_mismatch" }}
+        description={<p>O documento não poderá ser aprovado. O cliente será orientado a enviar o documento correto.</p>}
+      >
+        <ClientMessage defaultValue={CPF_MISMATCH_MESSAGE} />
+      </ConfirmDialog>
+      <ConfirmDialog
+        label="Solicitar complemento"
+        variant="secondary"
+        title="Solicitar complementação?"
+        confirmLabel="Solicitar ao cliente"
+        action={requestComplement.bind(null, caseId)}
+        hidden={hidden}
+        description={<p>O cliente verá “Precisamos complementar sua documentação”, os motivos e a sua observação.</p>}
+      >
+        <ReasonChoices />
+        <ClientMessage />
+      </ConfirmDialog>
+      <ConfirmDialog
+        label="Documento inválido"
+        variant="danger"
+        disabled={doc.status === "invalid"}
+        disabledReason="Documento já marcado como inválido."
+        title="Marcar o documento como inválido?"
+        confirmLabel="Marcar como inválido"
+        confirmVariant="danger"
+        action={markDocumentInvalid.bind(null, caseId)}
+        hidden={hidden}
+        description={<p>Use quando o arquivo não é um ComprovaBet, é de outro período ou não permite a análise. O cliente será orientado a enviar outro.</p>}
+      >
+        <ReasonChoices defaults={["not_comprovabet"]} />
+        <ClientMessage />
+      </ConfirmDialog>
+    </>
+  );
+}
+
 export default async function CasePage({
   params,
   searchParams,
@@ -130,6 +290,8 @@ export default async function CasePage({
     include: {
       user: true,
       assignedAdmin: { select: { id: true, name: true } },
+      paymentConfirmedBy: { select: { name: true } },
+      agreements: { orderBy: { acceptedAt: "desc" }, take: 1 },
       platforms: { include: { platform: true } },
       declarations: { orderBy: { createdAt: "desc" }, take: 1 },
       commitment: true,
@@ -174,6 +336,19 @@ export default async function CasePage({
         ? c.casinoGames.map((g) => labelFor(CASINO_GAMES, g)).join(", ")
         : labelFor(MAIN_LOSS_AREAS, c.mainLossArea);
 
+  const payment = c.paymentStatus as PaymentStatusValue;
+  const legacy = payment === "not_applicable";
+  const comprovabetDocs = c.documents.filter((d) => d.category === "comprovabet");
+  const primary = comprovabetDocs[comprovabetDocs.length - 1] ?? null;
+  const primaryStatus = primary ? (primary.status as DocumentStatusValue) : null;
+  const primaryCpf = primary?.cpfCheck ? (primary.cpfCheck as CpfCheckValue) : null;
+  const primaryDetails = (primary?.checkDetails ?? null) as { yearsMentioned?: number[]; referenceYearMentioned?: boolean | null } | null;
+  const cpfMasked = c.user.cpf ? maskCpf(c.user.cpf) : "—";
+  const cpfLocked = CPF_LOCKED_STATUSES.includes(status) || comprovabetDocs.some((d) => d.status === "valid");
+  const agreement = c.agreements[0] ?? null;
+  const canStart = status === "payment_confirmed" || (legacy && (status === "submitted" || status === "documents_received"));
+  const latestNote = c.notes[0] ?? null;
+
   return (
     <div id="topo" className="space-y-5">
       <Link href="/admin/casos" className="-ml-2 inline-flex items-center gap-1 rounded-lg px-2 py-1.5 text-sm font-medium text-navy-700 hover:bg-navy-50">
@@ -211,6 +386,170 @@ export default async function CasePage({
 
       {sp.ok && OK_MESSAGES[sp.ok] && <Notice tone="ok">{OK_MESSAGES[sp.ok]}</Notice>}
       {sp.erro && ERROR_MESSAGES[sp.erro] && <Notice tone="danger">{ERROR_MESSAGES[sp.erro]}</Notice>}
+
+      {/* ── Resumo e ações rápidas ─────────────────────────────── */}
+      <Section id="resumo" title="Resumo do caso">
+        <dl className="grid gap-x-6 sm:grid-cols-2 xl:grid-cols-3">
+          <Info label="Nome completo">{c.user.fullName}</Info>
+          <Info label="CPF">
+            {c.user.cpf ? (
+              <RevealCpf masked={cpfMasked} reveal={revealCpf.bind(null, c.id)} />
+            ) : (
+              <span className="text-muted">Não informado (cadastro anterior ao CPF)</span>
+            )}
+          </Info>
+          <Info label="Telefone (WhatsApp)">
+            <a href={`https://wa.me/55${c.user.whatsapp}`} target="_blank" rel="noopener noreferrer" className="text-navy-700 hover:underline">
+              {formatPhoneBR(c.user.whatsapp)}
+            </a>
+          </Info>
+          <Info label="E-mail">
+            <a href={`mailto:${c.user.email}`} className="break-all text-navy-700 hover:underline">
+              {c.user.email}
+            </a>
+          </Info>
+          <Info label="Data do cadastro">{formatDateTime(c.createdAt)}</Info>
+          <Info label="Documento enviado">
+            {primary ? (
+              <span className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                <span className="break-all">{primary.originalName}</span>
+                <a href={`/api/admin/documents/${primary.id}/view`} target="_blank" rel="noopener noreferrer" className="text-xs font-medium text-navy-700 hover:underline">
+                  Visualizar
+                </a>
+              </span>
+            ) : (
+              <span className="text-muted">Nenhum ComprovaBet · {plural(c.documents.length, "documento", "documentos")} no caso</span>
+            )}
+          </Info>
+          <Info label="Ano referente ao documento">
+            {primary ? (
+              <>
+                {primary.referenceYear ?? config.comprovabetYear}
+                {primaryDetails?.yearsMentioned && primaryDetails.yearsMentioned.length > 0 && (
+                  <span className={cx("block text-xs", primaryDetails.referenceYearMentioned === false ? "font-medium text-warn-700" : "text-muted")}>
+                    Anos citados no texto: {primaryDetails.yearsMentioned.join(", ")}
+                  </span>
+                )}
+              </>
+            ) : (
+              "—"
+            )}
+          </Info>
+          <Info label="Status da documentação">
+            {primaryStatus ? (
+              <span className="flex flex-wrap gap-1.5">
+                <Badge tone={DOCUMENT_STATUS_TONE[primaryStatus]}>{DOCUMENT_STATUS_LABEL[primaryStatus]}</Badge>
+                {primaryCpf && <Badge tone={CPF_CHECK_TONE[primaryCpf]}>{CPF_CHECK_LABEL[primaryCpf]}</Badge>}
+              </span>
+            ) : (
+              "—"
+            )}
+          </Info>
+          <Info label="Status da análise">
+            <Badge tone={CASE_STATUS_TONE[status]}>{CASE_STATUS_LABEL[status]}</Badge>
+          </Info>
+          <Info label="Status do pagamento">
+            <Badge tone={PAYMENT_STATUS_TONE[payment]}>{PAYMENT_STATUS_LABEL[payment]}</Badge>
+            {!legacy && payment !== "confirmed" && (
+              <span className="mt-1 block text-xs text-muted">
+                {agreement ? `Condições aceitas em ${formatDateTime(agreement.acceptedAt)}` : "Condições do serviço ainda não aceitas"}
+              </span>
+            )}
+          </Info>
+          <Info label="Solicitação de documentos adicionais">
+            {openRequest ? (
+              <span className="text-warn-700">
+                Em aberto desde {formatDate(openRequest.createdAt)}: {openRequest.reasons.map((r) => labelFor(REQUEST_REASONS, r)).join(", ")}
+              </span>
+            ) : (
+              <span className="text-muted">Nenhuma em aberto</span>
+            )}
+          </Info>
+          <Info label="Observações internas">
+            {latestNote ? (
+              <>
+                <span className="line-clamp-2">{latestNote.content}</span>
+                <a href="#notas" className="text-xs font-medium text-navy-700 hover:underline">
+                  Ver notas ({c.notes.length})
+                </a>
+              </>
+            ) : (
+              <a href="#notas" className="text-navy-700 hover:underline">
+                Adicionar nota
+              </a>
+            )}
+          </Info>
+        </dl>
+
+        <div className="mt-5 border-t border-line pt-4">
+          <p className="text-xs font-semibold uppercase tracking-wider text-muted">Ações rápidas</p>
+          <div className="mt-3 flex flex-wrap gap-2">
+            {primary ? (
+              <ComprovaBetActions doc={primary} caseId={c.id} cpfMasked={cpfMasked} />
+            ) : (
+              <ConfirmDialog
+                label="Solicitar complemento"
+                title="Solicitar complementação?"
+                confirmLabel="Solicitar ao cliente"
+                action={requestComplement.bind(null, c.id)}
+                description={<p>O cliente verá “Precisamos complementar sua documentação”, os motivos e a sua observação.</p>}
+              >
+                <ReasonChoices />
+                <ClientMessage />
+              </ConfirmDialog>
+            )}
+            <ConfirmDialog
+              label="Confirmar pagamento"
+              variant="secondary"
+              disabled={status !== "awaiting_payment"}
+              disabledReason="Disponível depois da aprovação do documento (etapa Aguardando pagamento)."
+              title="Confirmar o pagamento da análise?"
+              confirmLabel="Confirmar pagamento"
+              action={confirmPayment.bind(null, c.id)}
+              description={
+                <p>
+                  Confirme só depois de verificar o recebimento. O prazo estimado da análise (até {config.reviewDays} dias) passa a contar agora.
+                </p>
+              }
+            >
+              <label className="block text-sm font-medium text-ink">
+                Referência do pagamento (opcional)
+                <TextInput name="reference" maxLength={200} placeholder="Ex.: ID da transação ou forma de pagamento" className="mt-1.5 text-sm" />
+              </label>
+            </ConfirmDialog>
+            <ConfirmDialog
+              label="Iniciar análise"
+              variant="primary"
+              disabled={!canStart}
+              disabledReason="Disponível depois da validação documental e do pagamento confirmado."
+              title="Iniciar a análise do caso?"
+              confirmLabel="Iniciar análise"
+              action={startAnalysis.bind(null, c.id)}
+              description={<p>O cliente verá “Análise em andamento” no acompanhamento.</p>}
+            />
+            <ConfirmDialog
+              label="Concluir análise"
+              variant="primary"
+              disabled={status !== "under_review"}
+              disabledReason="Disponível com a análise em andamento."
+              title="Concluir a análise?"
+              confirmLabel="Concluir análise"
+              action={concludeAnalysis.bind(null, c.id)}
+              description={
+                <p>
+                  O cliente verá “Análise concluída”. Para registrar “Caso com possibilidade de prosseguimento” ou “Elementos insuficientes”, use “Status
+                  do caso”.
+                </p>
+              }
+            >
+              <label className="block text-sm font-medium text-ink">
+                Mensagem para o cliente (opcional)
+                <Textarea name="publicMessage" maxLength={1000} placeholder="Análise documental concluída." className="mt-1.5 min-h-20 text-sm" />
+              </label>
+            </ConfirmDialog>
+          </div>
+        </div>
+      </Section>
 
       {/* ── Valores ─────────────────────────────────────────────── */}
       <Section id="valores" title="Valores">
@@ -352,6 +691,9 @@ export default async function CasePage({
         <Section id="solicitante" title="Solicitante">
           <dl className="grid gap-x-6 sm:grid-cols-2">
             <Info label="Nome">{c.user.fullName}</Info>
+            <Info label="CPF">
+              {c.user.cpf ? <RevealCpf masked={cpfMasked} reveal={revealCpf.bind(null, c.id)} /> : <span className="text-muted">Não informado</span>}
+            </Info>
             <Info label="E-mail">
               <a href={`mailto:${c.user.email}`} className="text-navy-700 hover:underline">
                 {c.user.email}
@@ -368,6 +710,36 @@ export default async function CasePage({
               {c.privacyConsentIp && <span className="text-muted"> · IP {c.privacyConsentIp}</span>}
             </Info>
           </dl>
+          <div className="mt-3 border-t border-line pt-3">
+            {cpfLocked ? (
+              <p className="text-xs text-muted">CPF travado: a análise documental já avançou e o CPF não pode mais ser alterado.</p>
+            ) : admin.role === "admin" ? (
+              <ConfirmDialog
+                label="Corrigir CPF"
+                variant="ghost"
+                title="Corrigir o CPF do solicitante?"
+                confirmLabel="Corrigir CPF"
+                action={correctCpf.bind(null, c.id)}
+                description={
+                  <p>
+                    Use apenas para erro de digitação, antes da aprovação do documento. O ComprovaBet é conferido de novo com o CPF corrigido. Depois
+                    da validação documental, o CPF fica travado.
+                  </p>
+                }
+              >
+                <label className="block text-sm font-medium text-ink">
+                  CPF correto
+                  <TextInput name="cpf" required inputMode="numeric" autoComplete="off" maxLength={14} placeholder="000.000.000-00" className="mt-1.5" />
+                </label>
+                <label className="block text-sm font-medium text-ink">
+                  Motivo da correção
+                  <Textarea name="reason" required maxLength={300} className="mt-1.5 min-h-16 text-sm" />
+                </label>
+              </ConfirmDialog>
+            ) : (
+              <p className="text-xs text-muted">A correção do CPF é restrita a administradores.</p>
+            )}
+          </div>
         </Section>
 
         <Section id="classificacao" title="Classificação">
@@ -411,19 +783,39 @@ export default async function CasePage({
               const summary = doc.extractedSummary as unknown as ExtractionSummary | null;
               const docStatus = doc.status as DocumentStatusValue;
               const setStatus = bind(setDocumentStatus);
+              const isComprovaBet = doc.category === "comprovabet";
+              const cpfCheck = doc.cpfCheck ? (doc.cpfCheck as CpfCheckValue) : null;
+              const details = (doc.checkDetails ?? null) as { yearsMentioned?: number[]; referenceYearMentioned?: boolean | null } | null;
               return (
                 <li key={doc.id} id={`doc-${doc.id}`} className="scroll-mt-24 rounded-xl border border-line p-4">
                   <div className="flex flex-wrap items-start justify-between gap-3">
                     <div className="min-w-0">
                       <p className="break-all font-medium text-ink">{doc.originalName}</p>
                       <p className="mt-0.5 text-xs text-muted">
-                        {doc.platformName ?? "Sem plataforma"} · {categoryLabel(doc.category)} · {formatBytes(doc.sizeBytes)} ·{" "}
-                        {doc.uploadedVia === "additional" ? "Documentação adicional" : "Envio inicial"} · {formatDateTime(doc.createdAt)}
+                        {isComprovaBet
+                          ? `ComprovaBet ${doc.referenceYear ?? config.comprovabetYear}`
+                          : `${doc.platformName ?? "Sem plataforma"} · ${categoryLabel(doc.category)}`}{" "}
+                        · {formatBytes(doc.sizeBytes)} · {doc.uploadedVia === "additional" ? "Documentação adicional" : "Envio inicial"} ·{" "}
+                        {formatDateTime(doc.createdAt)}
                       </p>
                     </div>
-                    <Badge tone={DOCUMENT_STATUS_TONE[docStatus]}>{DOCUMENT_STATUS_LABEL[docStatus]}</Badge>
+                    <span className="flex flex-wrap gap-1.5">
+                      <Badge tone={DOCUMENT_STATUS_TONE[docStatus]}>{DOCUMENT_STATUS_LABEL[docStatus]}</Badge>
+                      {cpfCheck && <Badge tone={CPF_CHECK_TONE[cpfCheck]}>{CPF_CHECK_LABEL[cpfCheck]}</Badge>}
+                    </span>
                   </div>
 
+                  {isComprovaBet && doc.cpfCheckNote && (
+                    <p className={cx("mt-2 text-sm", cpfCheck === "mismatch" ? "text-danger-700" : "text-ink-soft")}>
+                      <span className="font-medium text-ink">Conferência do CPF:</span> {doc.cpfCheckNote}
+                    </p>
+                  )}
+                  {isComprovaBet && details?.yearsMentioned && details.yearsMentioned.length > 0 && (
+                    <p className={cx("mt-1 text-xs", details.referenceYearMentioned === false ? "font-medium text-warn-700" : "text-muted")}>
+                      Anos citados no texto: {details.yearsMentioned.join(", ")}
+                      {details.referenceYearMentioned === false && ` · o ano de referência (${doc.referenceYear ?? config.comprovabetYear}) não aparece`}
+                    </p>
+                  )}
                   {doc.reviewNote && <p className="mt-2 text-sm text-ink-soft">Observação: {doc.reviewNote}</p>}
                   {doc.reviewedBy && doc.reviewedAt && (
                     <p className="mt-1 text-xs text-muted">
@@ -487,23 +879,29 @@ export default async function CasePage({
                     <a href={`/api/admin/documents/${doc.id}/view`} target="_blank" rel="noopener noreferrer" className={buttonClasses("secondary", "sm")}>
                       <IconEye size={15} /> Visualizar
                     </a>
-                    <form action={setStatus}>
-                      <input type="hidden" name="documentId" value={doc.id} />
-                      <input type="hidden" name="status" value="valid" />
-                      <SubmitButton size="sm" variant="ok">
-                        Validar
-                      </SubmitButton>
-                    </form>
-                    <form action={setStatus}>
-                      <input type="hidden" name="documentId" value={doc.id} />
-                      <input type="hidden" name="status" value="divergent" />
-                      <SubmitButton size="sm" variant="danger">
-                        Marcar como divergente
-                      </SubmitButton>
-                    </form>
-                    <Link href={`/admin/casos/${c.id}?solicitar=${doc.id}#solicitar`} className={buttonClasses("secondary", "sm")}>
-                      Solicitar novo documento
-                    </Link>
+                    {isComprovaBet ? (
+                      <ComprovaBetActions doc={doc} caseId={c.id} cpfMasked={cpfMasked} />
+                    ) : (
+                      <>
+                        <form action={setStatus}>
+                          <input type="hidden" name="documentId" value={doc.id} />
+                          <input type="hidden" name="status" value="valid" />
+                          <SubmitButton size="sm" variant="ok" confirmMessage="Aprovar este documento?">
+                            Aprovar
+                          </SubmitButton>
+                        </form>
+                        <form action={setStatus}>
+                          <input type="hidden" name="documentId" value={doc.id} />
+                          <input type="hidden" name="status" value="divergent" />
+                          <SubmitButton size="sm" variant="danger" confirmMessage="Marcar este documento como inconsistente?">
+                            Marcar como inconsistente
+                          </SubmitButton>
+                        </form>
+                        <Link href={`/admin/casos/${c.id}?solicitar=${doc.id}#solicitar`} className={buttonClasses("secondary", "sm")}>
+                          Solicitar novo documento
+                        </Link>
+                      </>
+                    )}
                   </div>
                   <details className="mt-2">
                     <summary className="cursor-pointer text-xs font-medium text-muted hover:text-ink">Outras ações</summary>
@@ -533,12 +931,80 @@ export default async function CasePage({
                           <IconRefresh size={15} /> Refazer leitura
                         </SubmitButton>
                       </form>
+                      {isComprovaBet && (cpfCheck === "pending" || cpfCheck === "mismatch" || cpfCheck === null) && (
+                        <ConfirmDialog
+                          label="Conferir CPF manualmente"
+                          variant="ghost"
+                          title="Registrar a conferência manual do CPF?"
+                          confirmLabel="CPF confere"
+                          confirmVariant="ok"
+                          action={confirmCpfManually.bind(null, c.id)}
+                          hidden={{ documentId: doc.id }}
+                          description={
+                            <p>
+                              Confirme apenas depois de abrir o documento e verificar que o CPF é o mesmo do cadastro ({cpfMasked}).
+                              {cpfCheck === "mismatch" && " A leitura automática encontrou outro CPF: explique a conferência."}
+                            </p>
+                          }
+                        >
+                          <label className="block text-sm font-medium text-ink">
+                            Observação {cpfCheck === "mismatch" ? "(obrigatória)" : "(opcional)"}
+                            <Textarea name="note" required={cpfCheck === "mismatch"} maxLength={300} className="mt-1.5 min-h-16 text-sm" />
+                          </label>
+                        </ConfirmDialog>
+                      )}
                     </div>
                   </details>
                 </li>
               );
             })}
           </ul>
+        )}
+      </Section>
+
+      {/* ── Pagamento ─────────────────────────────────────────── */}
+      <Section id="pagamento" title="Pagamento da análise">
+        {legacy ? (
+          <p className="text-sm text-muted">Caso registrado antes da etapa de pagamento: não se aplica.</p>
+        ) : (
+          <>
+            <dl className="grid gap-x-6 sm:grid-cols-2 xl:grid-cols-4">
+              <Info label="Status">
+                <Badge tone={PAYMENT_STATUS_TONE[payment]}>{PAYMENT_STATUS_LABEL[payment]}</Badge>
+              </Info>
+              <Info label="Aceite das condições">
+                {agreement ? (
+                  <>
+                    {formatDateTime(agreement.acceptedAt)}
+                    <span className="block text-xs text-muted">
+                      versão {agreement.termsVersion}
+                      {agreement.termsVersion !== SERVICE_TERMS_VERSION && " (anterior à atual)"} · IP {agreement.ip ?? "—"}
+                    </span>
+                  </>
+                ) : (
+                  <span className="text-muted">Ainda não aceitas</span>
+                )}
+              </Info>
+              <Info label="Confirmado em">
+                {c.paymentConfirmedAt ? (
+                  <>
+                    {formatDateTime(c.paymentConfirmedAt)}
+                    {c.paymentConfirmedBy && <span className="block text-xs text-muted">por {c.paymentConfirmedBy.name}</span>}
+                  </>
+                ) : (
+                  "—"
+                )}
+              </Info>
+              <Info label="Referência">{c.paymentReference ?? "—"}</Info>
+            </dl>
+            {status === "awaiting_payment" && (
+              <p className="mt-3 text-xs text-muted">
+                {payment === "awaiting_confirmation"
+                  ? "O cliente informou que pagou. Confira o recebimento e use “Confirmar pagamento” no resumo do caso."
+                  : "Aguardando o cliente aceitar as condições e realizar o pagamento."}
+              </p>
+            )}
+          </>
         )}
       </Section>
 
@@ -553,10 +1019,13 @@ export default async function CasePage({
               ))}
             </Select>
             <Textarea name="publicMessage" placeholder="Mensagem para o cliente (opcional, aparece no acompanhamento)" maxLength={1000} className="text-sm" />
-            <SubmitButton size="sm" className="w-full sm:w-auto">
+            <SubmitButton size="sm" className="w-full sm:w-auto" confirmMessage="Atualizar o status do caso? O cliente verá a nova etapa no acompanhamento.">
               Atualizar status
             </SubmitButton>
-            <p className="text-xs text-muted">Para pedir documentos, use “Solicitar documentos”: o status muda automaticamente.</p>
+            <p className="text-xs text-muted">
+              Para seguir o fluxo (aprovação do documento, pagamento, início e conclusão da análise), prefira as ações rápidas do resumo. Para pedir
+              documentos, use “Solicitar documentos”: o status muda automaticamente.
+            </p>
           </form>
         </Section>
 
@@ -586,7 +1055,7 @@ export default async function CasePage({
               placeholder="Mensagem ao cliente (opcional)"
               defaultValue={requestDoc ? `Sobre o arquivo “${requestDoc.originalName}”: ` : ""}
             />
-            <SubmitButton size="sm" className="w-full sm:w-auto">
+            <SubmitButton size="sm" className="w-full sm:w-auto" confirmMessage="Solicitar documentos ao cliente? O caso passa para “Documentação complementar necessária”.">
               Solicitar documentos
             </SubmitButton>
           </form>

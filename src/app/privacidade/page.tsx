@@ -20,21 +20,24 @@ export default function PrivacidadePage() {
       <LegalSection title="1. Dados que tratamos">
         <LegalList
           items={[
-            "Identificação e contato: nome completo, e-mail e WhatsApp.",
+            "Identificação e contato: nome completo, CPF, e-mail e WhatsApp.",
             "Confirmação de maioridade (18 anos ou mais).",
             "Respostas do formulário: tipo de aposta, plataformas utilizadas, período, valores aproximados informados e situação do caso.",
-            "Documentos enviados por você, como históricos de depósitos, saques, financeiros e de apostas, que podem conter dados de movimentações financeiras.",
+            "Documentos enviados por você, principalmente o ComprovaBet anual e, quando solicitados, documentos complementares (como históricos de depósitos, saques e apostas), que podem conter dados de movimentações financeiras.",
             "Registro do compromisso voluntário: aceite, data e hora, endereço IP e identificação do navegador.",
+            "Registro do aceite das condições do serviço antes do pagamento da análise: data e hora, versão do texto, endereço IP e identificação do navegador.",
             "Dados técnicos de acesso: endereço IP, data e hora e identificação do navegador, inclusive nos acessos ao acompanhamento.",
           ]}
         />
-        <p>Não pedimos CPF, endereço, senhas de plataformas, senhas bancárias, códigos SMS ou códigos de autenticação.</p>
+        <p>Não pedimos endereço, senhas de plataformas, senhas bancárias, códigos SMS ou códigos de autenticação.</p>
       </LegalSection>
 
       <LegalSection title="2. Para que usamos os dados">
         <LegalList
           items={[
             "Analisar a documentação enviada e classificar o seu caso.",
+            "Conferir se o ComprovaBet pertence a você, comparando o CPF do documento com o CPF informado.",
+            "Registrar o aceite das condições e acompanhar o pagamento da análise.",
             "Conferir os valores informados com os documentos.",
             "Informar o andamento e o resultado da análise pelo painel de acompanhamento, e-mail ou WhatsApp.",
             "Solicitar documentos adicionais, quando necessários.",
@@ -65,6 +68,8 @@ export default function PrivacidadePage() {
           items={[
             "Os documentos ficam em armazenamento privado, sem endereço público, e só podem ser abertos pela equipe autorizada por meio de links temporários.",
             "Todo acesso aos documentos e aos casos é registrado.",
+            "O CPF aparece de forma mascarada (ex.: ***.***.***-00). O número completo só é visto pela equipe autorizada, e cada visualização é registrada. O CPF não é gravado nos registros de acesso.",
+            "Quando a leitura automática encontra no documento um CPF diferente do informado, o arquivo é recusado e não é armazenado.",
             "A comunicação com o site é criptografada (HTTPS).",
             "Os arquivos são verificados no envio: aceitamos apenas PDF, CSV, XLSX, JPG e PNG, e bloqueamos arquivos executáveis.",
           ]}

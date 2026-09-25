@@ -10,9 +10,10 @@ export default async function DashboardPage() {
   await requireAdmin();
   const d = await getDashboard();
   const kpis = [
-    { label: "Novas solicitações", value: d.groups.new, href: "/admin/casos?status=group:new" },
-    { label: "Em análise", value: d.groups.review, href: "/admin/casos?status=group:review" },
+    { label: "Validação documental", value: d.groups.new, href: "/admin/casos?status=group:new" },
     { label: "Aguardando documentos", value: d.groups.waiting, href: "/admin/casos?status=group:waiting" },
+    { label: "Pagamento", value: d.groups.payment, href: "/admin/casos?status=group:payment" },
+    { label: "Em análise", value: d.groups.review, href: "/admin/casos?status=group:review" },
     { label: "Concluídas", value: d.groups.done, href: "/admin/casos?status=group:done" },
   ];
   const maxPlatform = Math.max(1, ...d.platforms.map((p) => p.count));
@@ -29,7 +30,7 @@ export default async function DashboardPage() {
         </Link>
       </div>
 
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
         {kpis.map((k) => (
           <Link key={k.label} href={k.href} className="rounded-2xl border border-line bg-surface p-4 shadow-soft transition-colors hover:border-line-strong sm:p-5">
             <p className="text-sm text-muted">{k.label}</p>

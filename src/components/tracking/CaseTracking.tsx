@@ -1,10 +1,20 @@
+import type { ReactNode } from "react";
 import { trackingLogout } from "@/app/acompanhar/actions";
 import type { ClientCase } from "@/lib/cases/client-view";
+import {
+  ANALYSIS_IN_PROGRESS_TEXT,
+  COMPLEMENT_TEXT,
+  COMPLEMENT_TITLE,
+  CPF_MISMATCH_MESSAGE,
+  DOCUMENT_APPROVED_TEXT,
+  DOCUMENT_APPROVED_TITLE,
+  VALIDATION_PENDING_TEXT,
+} from "@/lib/comprovabet";
 import { cx } from "@/lib/cx";
 import { formatBRL, formatDate } from "@/lib/format";
 import { DEFAULT_NEXT_STEPS, REQUEST_REASONS, labelFor } from "@/lib/options";
 import { CASE_STATUS_LABEL, CASE_STATUS_TONE, clientTimeline, type TimelineState } from "@/lib/status";
-import { IconAlert, IconCheck, IconChevronRight, IconClock, IconLogout } from "../icons";
+import { IconAlert, IconCheck, IconChevronRight, IconClock, IconFile, IconLogout } from "../icons";
 import { Badge, LedgerRow, LinkButton } from "../ui";
 
 const DOT: Record<TimelineState, string> = {
@@ -14,66 +24,143 @@ const DOT: Record<TimelineState, string> = {
   pending: "bg-surface text-line-strong border-line-strong",
 };
 
-function ResultBlock({ data }: { data: ClientCase }) {
-  if (data.status === "eligible") {
-    return (
-      <section className="rounded-2xl border border-ok-600/25 bg-ok-50 p-5">
-        <p className="text-lg font-semibold leading-snug text-ok-700">Identificamos elementos que permitem prosseguir com seu caso.</p>
-        <details className="group mt-4">
-          <summary className="inline-flex min-h-12 cursor-pointer list-none items-center justify-center gap-2 rounded-xl bg-ok-600 px-5 text-[0.84rem] font-semibold uppercase tracking-[0.06em] text-white hover:bg-ok-700 [&::-webkit-details-marker]:hidden">
-            Ver próximos passos
-            <IconChevronRight size={16} className="transition-transform group-open:rotate-90" />
-          </summary>
-          <p className="mt-4 whitespace-pre-line text-[0.95rem] leading-relaxed text-ink">{data.nextSteps || DEFAULT_NEXT_STEPS}</p>
-        </details>
-      </section>
-    );
-  }
-  if (data.status === "not_eligible") {
-    return (
-      <section className="rounded-2xl border border-line bg-surface p-5">
-        <p className="text-[0.98rem] leading-relaxed text-ink">
-          Neste momento, não identificamos elementos suficientes para prosseguir com o caso.
-        </p>
-      </section>
-    );
-  }
-  if (data.status === "additional_documents") {
-    return (
-      <section className="rounded-2xl border border-warn-700/25 bg-warn-50 p-5">
-        <div className="flex items-start gap-3">
-          <IconAlert size={22} className="mt-0.5 shrink-0 text-warn-700" />
-          <div>
-            <p className="text-lg font-semibold text-warn-700">Precisamos de mais informações</p>
-            {data.openRequest && (
-              <ul className="mt-2 list-disc space-y-0.5 pl-5 text-sm text-warn-700">
-                {data.openRequest.reasons.map((r) => (
-                  <li key={r}>{labelFor(REQUEST_REASONS, r)}</li>
-                ))}
-              </ul>
-            )}
-            {data.openRequest?.message && <p className="mt-3 whitespace-pre-line text-sm text-ink">{data.openRequest.message}</p>}
+function Card({ tone = "neutral", title, children }: { tone?: "neutral" | "ok" | "warn" | "info"; title?: string; children: ReactNode }) {
+  const styles = {
+    neutral: "border-line bg-surface",
+    info: "border-navy-100 bg-navy-50",
+    ok: "border-ok-600/25 bg-ok-50",
+    warn: "border-warn-700/25 bg-warn-50",
+  }[tone];
+  const titleColor = { neutral: "text-ink", info: "text-navy-900", ok: "text-ok-700", warn: "text-warn-700" }[tone];
+  return (
+    <section className={cx("rounded-2xl border p-5", styles)}>
+      {title && <p className={cx("text-lg font-semibold leading-snug", titleColor)}>{title}</p>}
+      <div className={cx(title && "mt-2", "space-y-3 text-[0.95rem] leading-relaxed text-ink")}>{children}</div>
+    </section>
+  );
+}
+
+/** O que o solicitante precisa saber (e fazer) agora, conforme a etapa do caso. */
+function StageBlock({ data }: { data: ClientCase }) {
+  switch (data.status) {
+    case "submitted":
+    case "documents_received":
+      return (
+        <Card tone="info" title="Validação documental">
+          <p>{data.hasComprovaBet ? VALIDATION_PENDING_TEXT : "Seus documentos foram recebidos e estão aguardando a conferência da nossa equipe."}</p>
+        </Card>
+      );
+    case "additional_documents": {
+      const cpfProblem = data.document?.status === "cpf_mismatch" || data.openRequest?.reasons.includes("cpf_mismatch");
+      return (
+        <section className="rounded-2xl border border-warn-700/25 bg-warn-50 p-5">
+          <div className="flex items-start gap-3">
+            <IconAlert size={22} className="mt-0.5 shrink-0 text-warn-700" />
+            <div className="min-w-0">
+              <p className="text-lg font-semibold leading-snug text-warn-700">{COMPLEMENT_TITLE}</p>
+              <p className="mt-2 text-[0.95rem] leading-relaxed text-ink">{COMPLEMENT_TEXT}</p>
+              {cpfProblem && <p className="mt-3 text-[0.95rem] font-medium leading-relaxed text-danger-700">{CPF_MISMATCH_MESSAGE}</p>}
+              {data.openRequest && data.openRequest.reasons.length > 0 && (
+                <ul className="mt-3 list-disc space-y-0.5 pl-5 text-sm text-warn-700">
+                  {data.openRequest.reasons.map((r) => (
+                    <li key={r}>{labelFor(REQUEST_REASONS, r)}</li>
+                  ))}
+                </ul>
+              )}
+              {data.openRequest?.message && (
+                <div className="mt-3 rounded-xl bg-surface/80 px-4 py-3">
+                  <p className="text-xs font-semibold uppercase tracking-wider text-warn-700">Orientações da equipe</p>
+                  <p className="mt-1 whitespace-pre-line text-sm leading-relaxed text-ink">{data.openRequest.message}</p>
+                </div>
+              )}
+            </div>
           </div>
-        </div>
-        <LinkButton href="/acompanhar/documentos" className="mt-5 w-full">
-          Enviar documentos
-        </LinkButton>
-      </section>
-    );
+          {data.openRequest && (
+            <LinkButton href="/acompanhar/documentos" size="lg" className="mt-5 w-full">
+              Enviar documentos
+            </LinkButton>
+          )}
+        </section>
+      );
+    }
+    case "awaiting_payment":
+      return (
+        <>
+          {data.hasComprovaBet && (
+            <Card tone="ok" title={DOCUMENT_APPROVED_TITLE}>
+              <p>{DOCUMENT_APPROVED_TEXT}</p>
+            </Card>
+          )}
+          <section className="rounded-2xl border border-line bg-surface p-5 shadow-soft">
+            <p className="text-lg font-semibold leading-snug text-ink">
+              {data.paymentStatus === "awaiting_confirmation" ? "Pagamento em confirmação" : "Próximo passo: pagamento da análise"}
+            </p>
+            <p className="mt-2 text-[0.95rem] leading-relaxed text-ink-soft">
+              {data.paymentStatus === "awaiting_confirmation"
+                ? "Assim que a equipe confirmar o pagamento, a análise começa. Você acompanha por este painel."
+                : "Confira as condições do serviço e siga para o pagamento."}
+            </p>
+            <LinkButton href="/acompanhar/pagamento" size="lg" className="mt-5 w-full" variant={data.paymentStatus === "awaiting_confirmation" ? "secondary" : "primary"}>
+              {data.paymentStatus === "awaiting_confirmation" ? "Ver pagamento" : "Ir para o pagamento"}
+            </LinkButton>
+          </section>
+        </>
+      );
+    case "payment_confirmed":
+      return (
+        <Card tone="ok" title="Pagamento confirmado">
+          <p>Sua análise será iniciada pela nossa equipe. Você acompanha todas as etapas por este painel.</p>
+        </Card>
+      );
+    case "under_review":
+      return (
+        <Card tone="info" title="Análise em andamento">
+          <p>{ANALYSIS_IN_PROGRESS_TEXT}</p>
+        </Card>
+      );
+    case "eligible":
+      return (
+        <section className="rounded-2xl border border-ok-600/25 bg-ok-50 p-5">
+          <p className="text-lg font-semibold leading-snug text-ok-700">Identificamos elementos que permitem prosseguir com seu caso.</p>
+          <details className="group mt-4">
+            <summary className="inline-flex min-h-12 cursor-pointer list-none items-center justify-center gap-2 rounded-xl bg-ok-600 px-5 text-[0.84rem] font-semibold uppercase tracking-[0.06em] text-white hover:bg-ok-700 [&::-webkit-details-marker]:hidden">
+              Ver próximos passos
+              <IconChevronRight size={16} className="transition-transform group-open:rotate-90" />
+            </summary>
+            <p className="mt-4 whitespace-pre-line text-[0.95rem] leading-relaxed text-ink">{data.nextSteps || DEFAULT_NEXT_STEPS}</p>
+          </details>
+        </section>
+      );
+    case "not_eligible":
+      return (
+        <Card>
+          <p>Neste momento, não identificamos elementos suficientes para prosseguir com o caso.</p>
+        </Card>
+      );
+    case "completed":
+      return (
+        <Card title="Análise concluída">
+          <p>A análise documental do seu caso foi concluída.</p>
+          {data.nextSteps && <p className="whitespace-pre-line text-sm text-ink-soft">{data.nextSteps}</p>}
+        </Card>
+      );
   }
-  if (data.status === "completed") {
-    return (
-      <section className="rounded-2xl border border-line bg-surface p-5">
-        <p className="text-[0.98rem] leading-relaxed text-ink">A análise documental do seu caso foi concluída.</p>
-        {data.nextSteps && <p className="mt-3 whitespace-pre-line text-sm leading-relaxed text-ink-soft">{data.nextSteps}</p>}
-      </section>
-    );
-  }
-  return null;
 }
 
 export function CaseTracking({ data }: { data: ClientCase }) {
-  const timeline = clientTimeline(data.status, data.history);
+  const timeline = clientTimeline({
+    status: data.status,
+    paymentStatus: data.paymentStatus,
+    history: data.history,
+    createdAt: data.createdAt,
+    documentSentAt: data.documentSentAt,
+    hasComprovaBet: data.hasComprovaBet,
+    documentApprovedAt: data.documentApprovedAt,
+    paymentConfirmedAt: data.paymentConfirmedAt,
+  });
+  // O prazo da análise conta a partir do pagamento (casos antigos mantêm o prazo original).
+  const showDeadline =
+    data.paymentStatus === "not_applicable" || data.paymentStatus === "confirmed" || ["under_review", "payment_confirmed"].includes(data.status);
   return (
     <div className="step-in space-y-5">
       <div className="flex items-start justify-between gap-3">
@@ -89,11 +176,11 @@ export function CaseTracking({ data }: { data: ClientCase }) {
       </div>
 
       <div className="flex flex-wrap items-center gap-2">
-        <span className="text-sm text-ink-soft">Status atual:</span>
+        <span className="text-sm text-ink-soft">Etapa atual:</span>
         <Badge tone={CASE_STATUS_TONE[data.status]}>{CASE_STATUS_LABEL[data.status]}</Badge>
       </div>
 
-      <ResultBlock data={data} />
+      <StageBlock data={data} />
 
       <section className="rounded-2xl border border-line bg-surface p-5 shadow-soft">
         <h2 className="text-sm font-semibold text-ink">Andamento</h2>
@@ -111,16 +198,41 @@ export function CaseTracking({ data }: { data: ClientCase }) {
                 {step.state === "current" && <span className="size-2 rounded-full bg-navy-900" />}
                 {step.state === "attention" && <span className="size-2 rounded-full bg-warn-700" />}
               </span>
-              <div className="pt-0.5">
-                <p className={cx("font-medium", step.state === "pending" ? "text-muted" : "text-ink")}>{step.label}</p>
-                {step.state === "attention" && <p className="text-sm text-warn-700">Aguardando documentos adicionais</p>}
-                {step.state === "current" && step.key === "analysis" && <p className="text-sm text-ink-soft">Em andamento</p>}
+              <div className="min-w-0 pt-0.5">
+                <p className={cx("font-medium", step.state === "pending" ? "text-muted" : "text-ink")}>
+                  <span className="mr-1.5 text-sm tabular-nums text-muted">{i + 1}.</span>
+                  {step.label}
+                </p>
+                {step.note && <p className={cx("text-sm", step.state === "attention" ? "text-warn-700" : "text-ink-soft")}>{step.note}</p>}
+                {step.state === "current" && !step.note && <p className="text-sm text-ink-soft">Etapa atual</p>}
                 {step.date && step.state !== "pending" && <p className="text-sm text-muted">{formatDate(step.date)}</p>}
               </div>
             </li>
           ))}
         </ol>
       </section>
+
+      {data.document && (
+        <section className="rounded-2xl border border-line bg-surface p-5 shadow-soft">
+          <h2 className="text-sm font-semibold text-ink">Seu documento</h2>
+          <div className="mt-3 flex items-center gap-3">
+            <span className="grid size-10 shrink-0 place-items-center rounded-lg bg-paper text-navy-700">
+              <IconFile size={19} />
+            </span>
+            <div className="min-w-0 flex-1">
+              <p className="truncate text-sm font-medium text-ink">{data.document.name}</p>
+              <p className="text-xs text-muted">
+                Documento enviado em {formatDate(data.document.sentAt)}
+                {data.cpfMasked ? ` · CPF ${data.cpfMasked}` : ""}
+              </p>
+            </div>
+          </div>
+          <div className="mt-3 flex flex-wrap gap-2">
+            <Badge tone={data.document.tone}>{data.document.label}</Badge>
+            {data.document.cpf && <Badge tone={data.document.cpf.tone}>{data.document.cpf.label}</Badge>}
+          </div>
+        </section>
+      )}
 
       <section className="rounded-2xl border border-line bg-surface px-5 pb-2 pt-5 shadow-soft">
         <h2 className="text-sm font-semibold text-ink">Valores</h2>
@@ -136,15 +248,17 @@ export function CaseTracking({ data }: { data: ClientCase }) {
             hint="Não representa valor a ser recuperado"
             value={data.validatedLossCents === null ? <span className="text-muted">—</span> : formatBRL(data.validatedLossCents)}
           />
-          <LedgerRow
-            label="Prazo"
-            value={
-              <span className="inline-flex items-center gap-1.5">
-                <IconClock size={16} className="text-muted" />
-                Até {formatDate(data.reviewDeadline)}
-              </span>
-            }
-          />
+          {showDeadline && (
+            <LedgerRow
+              label="Prazo estimado"
+              value={
+                <span className="inline-flex items-center gap-1.5">
+                  <IconClock size={16} className="text-muted" />
+                  Até {formatDate(data.reviewDeadline)}
+                </span>
+              }
+            />
+          )}
         </dl>
       </section>
 
@@ -156,8 +270,8 @@ export function CaseTracking({ data }: { data: ClientCase }) {
       )}
 
       <p className="text-sm leading-relaxed text-muted">
-        Plataformas: {data.platforms.join(", ")} · {data.documentsCount} {data.documentsCount === 1 ? "documento" : "documentos"} recebidos. Cada caso
-        é analisado individualmente e o envio das informações não garante recuperação de valores.
+        Plataformas: {data.platforms.join(", ")} · {data.documentsCount} {data.documentsCount === 1 ? "documento recebido" : "documentos recebidos"}.
+        Cada caso é analisado individualmente. A análise não garante recuperação, restituição ou recebimento de valores.
       </p>
     </div>
   );

@@ -2,7 +2,15 @@ import { prisma } from "@/lib/db";
 import { config } from "@/lib/env";
 import { safeEqual, sha256Hex } from "@/lib/security";
 
-export type DraftAuth = { id: string; isDemo: boolean; expired: boolean; submittedAt: Date | null; caseId: string | null };
+export type DraftAuth = {
+  id: string;
+  isDemo: boolean;
+  expired: boolean;
+  submittedAt: Date | null;
+  caseId: string | null;
+  /** CPF informado no formulário (somente dígitos). Nunca é devolvido ao navegador sem máscara. */
+  cpf: string | null;
+};
 
 /**
  * Rascunhos são identificados por cabeçalhos x-draft-id / x-draft-token.
@@ -21,5 +29,6 @@ export async function authenticateDraft(req: Request): Promise<DraftAuth | null>
     expired: draft.expiresAt.getTime() < Date.now(),
     submittedAt: draft.submittedAt,
     caseId: draft.caseId,
+    cpf: draft.cpf,
   };
 }

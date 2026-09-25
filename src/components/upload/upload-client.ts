@@ -8,9 +8,13 @@ export function tempId(): string {
   return typeof crypto !== "undefined" && "randomUUID" in crypto ? crypto.randomUUID() : `${Date.now()}-${Math.random()}`;
 }
 
-export function preflightError(file: File): string | null {
+export function preflightError(
+  file: File,
+  allowed: string[] = ACCEPTED_EXTENSIONS,
+  message = "Formato não aceito. Envie PDF, CSV, XLSX, JPG ou PNG.",
+): string | null {
   const ext = file.name.split(".").pop()?.toLowerCase() ?? "";
-  if (!ACCEPTED_EXTENSIONS.includes(ext)) return "Formato não aceito. Envie PDF, CSV, XLSX, JPG ou PNG.";
+  if (!allowed.includes(ext)) return message;
   if (file.size === 0) return "O arquivo está vazio.";
   return null;
 }
@@ -43,7 +47,7 @@ export async function shrinkImageIfNeeded(file: File, maxBytes: number): Promise
   return file;
 }
 
-export type UploadResponse = { status: number; body: { file?: unknown; error?: string } };
+export type UploadResponse = { status: number; body: { file?: unknown; error?: string; field?: string } };
 
 export function uploadWithProgress(
   url: string,

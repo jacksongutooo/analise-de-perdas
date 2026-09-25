@@ -2,6 +2,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { LegalList, LegalPage, LegalSection } from "@/components/legal";
+import { PAYMENT_NOTICE, SERVICE_TERMS_VERSION } from "@/lib/comprovabet";
 import { config } from "@/lib/env";
 import { site } from "@/lib/site";
 
@@ -9,8 +10,9 @@ export const metadata: Metadata = { title: "Termos de Uso" };
 
 export default function TermosPage() {
   const company = site.legalName || site.name;
+  const year = config.comprovabetYear;
   return (
-    <LegalPage title="Termos de Uso" updatedAt="setembro de 2026">
+    <LegalPage title="Termos de Uso" updatedAt={`setembro de 2026 · versão ${SERVICE_TERMS_VERSION}`}>
       <p>
         Estes termos regulam o uso do site de {company}
         {site.cnpj ? ` (CNPJ ${site.cnpj})` : ""} para solicitar a análise documental de perdas em apostas online. Ao enviar uma solicitação, você
@@ -23,14 +25,15 @@ export default function TermosPage() {
 
       <LegalSection title="1. O que é o serviço">
         <p>
-          Realizamos uma análise documental individual das informações e dos comprovantes enviados por você, para verificar se existem elementos que
+          Realizamos uma análise documental individual das informações e dos documentos enviados por você, para avaliar se existem elementos que
           permitam prosseguir com o seu caso. A análise não é garantia de resultado.
         </p>
         <LegalList
           items={[
             "Cada caso é analisado individualmente.",
-            "O envio das informações não garante recuperação de valores.",
+            "O envio das informações não garante recuperação, restituição, indenização ou recebimento de valores.",
             "Os valores exibidos no acompanhamento (declarado, identificado e validado) são referências da análise documental e não representam valores a serem recuperados.",
+            "O serviço é oferecido de forma independente e não é um serviço oficial ou governamental.",
           ]}
         />
       </LegalSection>
@@ -42,22 +45,41 @@ export default function TermosPage() {
         </p>
       </LegalSection>
 
-      <LegalSection title="3. Prazo">
+      <LegalSection title="3. Documentação">
+        <LegalList
+          items={[
+            `O documento principal da análise é o ComprovaBet anual referente a ${year}.`,
+            "O ComprovaBet deve estar em nome do próprio solicitante e corresponder ao CPF informado no cadastro. Quando possível, o CPF do documento é conferido automaticamente; nos demais casos, a conferência é feita pela equipe.",
+            "Se o ComprovaBet estiver completo e consistente, não serão pedidos outros documentos naquele momento. Havendo informação faltante ou inconsistência, a equipe poderá solicitar documentos complementares.",
+            "O CPF não pode ser alterado depois que a análise documental estiver em andamento.",
+          ]}
+        />
+      </LegalSection>
+
+      <LegalSection title="4. Pagamento da análise">
+        <p>O pagamento é liberado depois da validação documental. {PAYMENT_NOTICE}</p>
         <p>
-          O prazo máximo estimado para retorno é de até {config.reviewDays} dias a partir do envio completo. Se forem necessários documentos
-          adicionais, a análise continua após o recebimento deles e o prazo pode ser ajustado.
+          Antes do pagamento, você declara que as informações e os documentos enviados são verdadeiros e pertencem ao solicitante cadastrado. O
+          aceite é registrado com data, hora e a versão destas condições.
         </p>
       </LegalSection>
 
-      <LegalSection title="4. Compromisso voluntário">
+      <LegalSection title="5. Prazo">
+        <p>
+          O prazo estimado para a análise é de até {config.reviewDays} dias a partir da confirmação do pagamento. Se forem necessários documentos
+          complementares, a análise continua após o recebimento deles e o prazo pode ser ajustado.
+        </p>
+      </LegalSection>
+
+      <LegalSection title="6. Compromisso voluntário">
         <p>
           O compromisso de não realizar novas apostas durante a análise é uma decisão pessoal e voluntária. Ele não representa bloqueio técnico das
           suas contas e o seu cumprimento não garante aprovação ou recuperação de valores. Para um bloqueio efetivo, existe a autoexclusão oficial do
-          Governo Federal, disponível em gov.br/autoexclusaoapostas.
+          Governo Federal, disponível em gov.br/autoexclusaoapostas, que não tem relação com este serviço.
         </p>
       </LegalSection>
 
-      <LegalSection title="5. Segurança e comunicação">
+      <LegalSection title="7. Segurança e comunicação">
         <p>
           Nunca solicitaremos sua senha da plataforma, senha bancária, código SMS ou código de autenticação. Se alguém pedir esses dados em nosso
           nome, não informe e comunique-nos. O acompanhamento do caso é feito com o protocolo e o e-mail informados na solicitação; mantenha esses
@@ -65,17 +87,17 @@ export default function TermosPage() {
         </p>
       </LegalSection>
 
-      <LegalSection title="6. Responsabilidades">
+      <LegalSection title="8. Responsabilidades">
         <LegalList
           items={[
             "Você é responsável pela veracidade das informações e pela autenticidade dos documentos enviados.",
-            "Podemos recusar ou encerrar solicitações com indícios de fraude, dados falsos ou uso indevido do serviço.",
+            "Podemos recusar ou encerrar solicitações com indícios de fraude, dados falsos, documentos de terceiros ou uso indevido do serviço.",
             "O site pode passar por manutenções e indisponibilidades temporárias.",
           ]}
         />
       </LegalSection>
 
-      <LegalSection title="7. Alterações e legislação">
+      <LegalSection title="9. Alterações e legislação">
         <p>
           Estes termos podem ser atualizados, e a versão vigente estará sempre nesta página. Aplica-se a legislação brasileira, inclusive o Código de
           Defesa do Consumidor, sendo competente o foro do domicílio do consumidor.

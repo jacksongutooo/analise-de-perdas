@@ -60,11 +60,11 @@ export async function linesFromPdfDocument(pdf: PdfDocumentLike, maxPages = 40):
   return lines;
 }
 
-export async function readPdfLines(buf: Buffer): Promise<string[]> {
+export async function readPdfLines(buf: Buffer, maxPages = 40): Promise<string[]> {
   const { getDocumentProxy } = await import("unpdf");
   const pdf = await getDocumentProxy(new Uint8Array(buf));
   try {
-    return await linesFromPdfDocument(pdf as unknown as PdfDocumentLike);
+    return await linesFromPdfDocument(pdf as unknown as PdfDocumentLike, maxPages);
   } finally {
     await (pdf as unknown as { destroy?: () => Promise<void> }).destroy?.();
   }

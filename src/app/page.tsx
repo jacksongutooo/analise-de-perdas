@@ -1,16 +1,17 @@
-import { IconFile, IconLock } from "@/components/icons";
+import { IconFile, IconLock, IconShield } from "@/components/icons";
 import { SiteFooter, SiteHeader } from "@/components/site";
 import { LinkButton } from "@/components/ui";
+import { TRUST_LINE } from "@/lib/comprovabet";
 import { config } from "@/lib/env";
 import { NO_PASSWORD_NOTICE } from "@/lib/options";
 
-const DOCUMENTS = [
-  { title: "Histórico de depósitos", hint: "Baixado na área financeira da plataforma" },
-  { title: "Histórico de saques", hint: "Inclua saques recusados ou pendentes, se houver" },
-  { title: "Histórico financeiro ou relatório da conta", hint: "Extrato completo das movimentações" },
-];
-
 export default function HomePage() {
+  const year = config.comprovabetYear;
+  const checklist = [
+    { title: "Seu CPF", hint: "O mesmo CPF que aparece no documento" },
+    { title: `ComprovaBet ${year}`, hint: "Documento anual em seu nome, de preferência em PDF" },
+    { title: "E-mail e WhatsApp", hint: "Para acompanhar o caso e receber orientações" },
+  ];
   return (
     <div className="flex min-h-dvh flex-col">
       <SiteHeader />
@@ -20,16 +21,14 @@ export default function HomePage() {
             Teve perdas em apostas online?
           </h1>
           <p className="mt-5 max-w-[34ch] text-lg leading-relaxed text-ink-soft sm:text-xl">
-            Envie suas informações e comprovantes para análise do seu caso.
+            Envie seu ComprovaBet {year} para uma análise documental do seu caso.
           </p>
           <LinkButton href="/analise" size="lg" className="mt-8 w-full sm:w-auto">
             Iniciar análise
           </LinkButton>
-          <p className="mt-5 text-sm font-medium text-ink-soft">
-            100% online • Análise documental • Retorno em até {config.reviewDays} dias
-          </p>
+          <p className="mt-5 text-sm font-medium text-ink-soft">100% online • Análise documental • Acompanhamento em todas as etapas</p>
           <p className="mt-3 max-w-[52ch] text-sm leading-relaxed text-muted">
-            Cada caso é analisado individualmente. O envio das informações não garante recuperação de valores.
+            Cada caso é analisado individualmente. A análise não garante recuperação, restituição ou recebimento de valores.
           </p>
         </section>
 
@@ -38,24 +37,28 @@ export default function HomePage() {
             <h2 id="antes" className="text-xl font-semibold tracking-tight text-ink">
               Antes de começar
             </h2>
-            <p className="mt-1 text-sm text-muted">Tenha em mãos, de cada plataforma que utilizou:</p>
+            <p className="mt-1 text-sm text-muted">Tenha em mãos:</p>
             <ul className="mt-5 divide-y divide-dashed divide-line-strong border-y border-dashed border-line-strong">
-              {DOCUMENTS.map((doc) => (
-                <li key={doc.title} className="flex items-start gap-3.5 py-4">
+              {checklist.map((item) => (
+                <li key={item.title} className="flex items-start gap-3.5 py-4">
                   <span className="grid size-9 shrink-0 place-items-center rounded-lg bg-paper text-navy-700">
                     <IconFile size={18} />
                   </span>
                   <span>
-                    <span className="block font-medium text-ink">{doc.title}</span>
-                    <span className="block text-sm text-muted">{doc.hint}</span>
+                    <span className="block font-medium text-ink">{item.title}</span>
+                    <span className="block text-sm text-muted">{item.hint}</span>
                   </span>
                 </li>
               ))}
             </ul>
             <LinkButton href="/analise" variant="secondary" className="mt-6 w-full">
-              Tenho os documentos
+              Tenho o ComprovaBet
             </LinkButton>
-            <p className="mt-5 flex items-start gap-2 text-xs leading-relaxed text-muted">
+            <p className="mt-5 flex items-start gap-2 text-sm leading-relaxed text-ink-soft">
+              <IconShield size={17} className="mt-0.5 shrink-0 text-navy-700" />
+              {TRUST_LINE}
+            </p>
+            <p className="mt-3 flex items-start gap-2 text-xs leading-relaxed text-muted">
               <IconLock size={15} className="mt-0.5 shrink-0" />
               {NO_PASSWORD_NOTICE}
             </p>

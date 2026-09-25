@@ -5,5 +5,9 @@ import { config } from "@/lib/env";
 export const metadata: Metadata = { title: "Iniciar análise" };
 
 export default function AnalisePage() {
-  return <AnalysisWizard settings={{ maxUploadMb: config.maxUploadMb, reviewDays: config.reviewDays }} />;
+  return (
+    <AnalysisWizard
+      settings={{ maxUploadMb: config.maxUploadMb, reviewDays: config.reviewDays, comprovabetYear: config.comprovabetYear }}
+    />
+  );
 }

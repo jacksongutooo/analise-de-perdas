@@ -1,10 +1,10 @@
 import { randomUUID } from "node:crypto";
-import type { DocumentCategory } from "@prisma/client";
+import type { DocumentCategory, Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import { config, maxUploadBytes } from "@/lib/env";
 import { sha256Hex } from "@/lib/security";
 import { getStorage } from "@/lib/storage";
-import { detectFileType, extensionOf } from "./detect";
+import { detectFileType, extensionOf, type AllowedKind } from "./detect";
 import { sanitizeFileName } from "./names";
 
 export type UploadedFileDTO = {
@@ -14,6 +14,8 @@ export type UploadedFileDTO = {
   platform: string | null;
   category: string;
   createdAt: string;
+  /** A conferência do CPF deste arquivo depende da equipe (sem leitura automática possível). */
+  manualCheck?: boolean;
 };
 
 export function toUploadedFileDTO(d: {
@@ -23,6 +25,7 @@ export function toUploadedFileDTO(d: {
   platformName: string | null;
   category: string;
   createdAt: Date;
+  cpfCheck?: string | null;
 }): UploadedFileDTO {
   return {
     id: d.id,
@@ -31,10 +34,15 @@ export function toUploadedFileDTO(d: {
     platform: d.platformName,
     category: d.category,
     createdAt: d.createdAt.toISOString(),
+    ...(d.category === "comprovabet" ? { manualCheck: d.cpfCheck !== "match" && d.cpfCheck !== "manual_match" } : {}),
   };
 }
 
 type Failure = { ok: false; status: number; error: string };
+
+/** Dados extras gravados no documento após a inspeção do conteúdo (ex.: conferência do CPF). */
+export type InspectionData = Partial<Pick<Prisma.DocumentUncheckedCreateInput, "cpfCheck" | "cpfCheckNote" | "cpfCheckedAt" | "checkDetails">>;
+export type Inspector = (buffer: Buffer, kind: AllowedKind) => Promise<{ ok: true; data: InspectionData } | Failure>;
 
 /** Lê o multipart da requisição, recusando corpos grandes antes de carregá-los na memória. */
 export async function readUploadForm(req: Request): Promise<{ ok: true; form: FormData } | Failure> {
@@ -63,6 +71,12 @@ export async function acceptUpload(input: {
   uploadedVia: "form" | "additional";
   requestId?: string | null;
   isDemo: boolean;
+  /** Restringe os formatos aceitos (o ComprovaBet aceita só PDF, JPG e PNG). */
+  allowedKinds?: AllowedKind[];
+  allowedKindsError?: string;
+  /** Inspeção do conteúdo ANTES de gravar: pode recusar o arquivo (ex.: CPF de outra pessoa). */
+  inspect?: Inspector;
+  referenceYear?: number | null;
 }): Promise<{ ok: true; documentId: string; file: UploadedFileDTO } | Failure> {
   const { file } = input;
   if (file.size === 0) return { ok: false, status: 400, error: "O arquivo está vazio." };
@@ -73,6 +87,9 @@ export async function acceptUpload(input: {
   const buffer = Buffer.from(await file.arrayBuffer());
   const detected = detectFileType(buffer, extension);
   if (!detected.ok) return { ok: false, status: 415, error: detected.error };
+  if (input.allowedKinds && !input.allowedKinds.includes(detected.kind)) {
+    return { ok: false, status: 415, error: input.allowedKindsError ?? "Formato não aceito para este documento." };
+  }
 
   const ownerWhere = "draftId" in input.owner ? { draftId: input.owner.draftId } : { caseId: input.owner.caseId };
   const count = await prisma.document.count({ where: ownerWhere });
@@ -93,6 +110,14 @@ export async function acceptUpload(input: {
     },
     select: { id: true },
   });
+
+  // Arquivos recusados na inspeção não chegam ao armazenamento.
+  let inspection: InspectionData = {};
+  if (input.inspect) {
+    const result = await input.inspect(buffer, detected.kind);
+    if (!result.ok) return result;
+    inspection = result.data;
+  }
 
   const now = new Date();
   const month = `${now.getUTCFullYear()}/${String(now.getUTCMonth() + 1).padStart(2, "0")}`;
@@ -117,6 +142,8 @@ export async function acceptUpload(input: {
         status: elsewhere ? "duplicate" : "pending",
         duplicateOfId: elsewhere?.id ?? null,
         reviewNote: elsewhere ? "Arquivo idêntico já enviado em outro caso." : null,
+        referenceYear: input.referenceYear ?? null,
+        ...inspection,
       },
     });
     return { ok: true, documentId: doc.id, file: toUploadedFileDTO(doc) };
