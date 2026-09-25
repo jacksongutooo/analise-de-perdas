@@ -212,25 +212,33 @@ export function CaseTracking({ data }: { data: ClientCase }) {
         </ol>
       </section>
 
-      {data.document && (
+      {data.documents.length > 0 && (
         <section className="rounded-2xl border border-line bg-surface p-5 shadow-soft">
-          <h2 className="text-sm font-semibold text-ink">Seu documento</h2>
-          <div className="mt-3 flex items-center gap-3">
-            <span className="grid size-10 shrink-0 place-items-center rounded-lg bg-paper text-navy-700">
-              <IconFile size={19} />
-            </span>
-            <div className="min-w-0 flex-1">
-              <p className="truncate text-sm font-medium text-ink">{data.document.name}</p>
-              <p className="text-xs text-muted">
-                Documento enviado em {formatDate(data.document.sentAt)}
-                {data.cpfMasked ? ` · CPF ${data.cpfMasked}` : ""}
-              </p>
-            </div>
-          </div>
-          <div className="mt-3 flex flex-wrap gap-2">
-            <Badge tone={data.document.tone}>{data.document.label}</Badge>
-            {data.document.cpf && <Badge tone={data.document.cpf.tone}>{data.document.cpf.label}</Badge>}
-          </div>
+          <h2 className="text-sm font-semibold text-ink">{data.documents.length === 1 ? "Seu documento" : "Seus documentos"}</h2>
+          {data.cpfMasked && (
+            <p className="mt-1 text-sm text-muted">
+              CPF cadastrado: <span className="font-medium tabular-nums tracking-wide text-ink-soft">{data.cpfMasked}</span>
+            </p>
+          )}
+          <ul className="mt-2 divide-y divide-dashed divide-line-strong">
+            {data.documents.map((doc) => (
+              <li key={doc.id} className="py-3 last:pb-0">
+                <div className="flex items-center gap-3">
+                  <span className="grid size-10 shrink-0 place-items-center rounded-lg bg-paper text-navy-700">
+                    <IconFile size={19} />
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-sm font-medium text-ink">{doc.name}</p>
+                    <p className="text-xs text-muted">ComprovaBet · enviado em {formatDate(doc.sentAt)}</p>
+                  </div>
+                </div>
+                <div className="mt-2.5 flex flex-wrap gap-2">
+                  <Badge tone={doc.tone}>{doc.label}</Badge>
+                  {doc.cpf && <Badge tone={doc.cpf.tone}>{doc.cpf.label}</Badge>}
+                </div>
+              </li>
+            ))}
+          </ul>
         </section>
       )}
 

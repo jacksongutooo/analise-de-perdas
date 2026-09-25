@@ -36,13 +36,13 @@ export default async function RecebidaPage() {
         <p className="mt-6 font-semibold text-ink">Próximos passos</p>
         <ol className="mt-2 space-y-1.5 text-[0.95rem] text-ink-soft">
           <li className="flex gap-2.5">
-            <span className="w-4 tabular-nums text-muted">1.</span>Validação do ComprovaBet pela equipe
+            <span className="w-5 shrink-0 tabular-nums text-muted">1.</span>Validação do ComprovaBet pela equipe
           </li>
           <li className="flex gap-2.5">
-            <span className="w-4 tabular-nums text-muted">2.</span>Pagamento da análise
+            <span className="w-5 shrink-0 tabular-nums text-muted">2.</span>Pagamento da análise
           </li>
           <li className="flex gap-2.5">
-            <span className="w-4 tabular-nums text-muted">3.</span>Análise do caso (prazo estimado de até {config.reviewDays} dias após o pagamento)
+            <span className="w-5 shrink-0 tabular-nums text-muted">3.</span>Análise do caso (prazo estimado de até {config.reviewDays} dias após o pagamento)
           </li>
         </ol>
 

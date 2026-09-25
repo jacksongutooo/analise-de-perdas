@@ -61,9 +61,21 @@ export async function loadClientCase(caseId: string) {
   });
   if (!c || c.isDemo !== config.demoMode) return null;
   const latestMessage = [...c.statusHistory].reverse().find((h) => h.publicMessage)?.publicMessage ?? null;
-  const comprovabet = c.documents;
+  const comprovabet = c.documents.map((d) => {
+    const status = d.status as DocumentStatusValue;
+    return {
+      id: d.id,
+      name: d.originalName,
+      sentAt: d.createdAt,
+      reviewedAt: d.reviewedAt,
+      status,
+      ...clientDocumentLabel(status),
+      cpf: clientCpfLabel(status, d.cpfCheck as CpfCheckValue),
+    };
+  });
   const current = comprovabet[comprovabet.length - 1] ?? null;
   const approved = [...comprovabet].reverse().find((d) => d.status === "valid") ?? null;
+  const approvedAt = approved ? (approved.reviewedAt ?? approved.sentAt) : null;
   return {
     id: c.id,
     protocol: c.protocol,
@@ -80,17 +92,11 @@ export async function loadClientCase(caseId: string) {
     platforms: c.platforms.map((p) => p.platform.name),
     documentsCount: c._count.documents,
     hasComprovaBet: comprovabet.length > 0,
-    document: current
-      ? {
-          name: current.originalName,
-          sentAt: current.createdAt,
-          status: current.status as DocumentStatusValue,
-          ...clientDocumentLabel(current.status as DocumentStatusValue),
-          cpf: clientCpfLabel(current.status as DocumentStatusValue, current.cpfCheck as CpfCheckValue),
-        }
-      : null,
-    documentSentAt: comprovabet[0]?.createdAt ?? null,
-    documentApprovedAt: approved ? (approved.reviewedAt ?? approved.createdAt) : null,
+    /** Arquivos do ComprovaBet (o último é o mais recente). */
+    documents: comprovabet,
+    document: current,
+    documentSentAt: comprovabet[0]?.sentAt ?? null,
+    documentApprovedAt: approvedAt,
     termsAcceptedAt: c.agreements[0]?.acceptedAt ?? null,
     history: c.statusHistory.map((h) => ({ toStatus: h.toStatus as string, fromStatus: h.fromStatus as string | null, createdAt: h.createdAt })),
     latestMessage,

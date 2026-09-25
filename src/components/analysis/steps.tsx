@@ -497,7 +497,7 @@ export function ReviewStep({
       <dl className="divide-y divide-line rounded-2xl border border-line bg-surface px-5 shadow-soft">
         <ReviewRow label="Seus dados" onEdit={() => goTo("contact")}>
           <span className="block">{data.fullName}</span>
-          <span className="block font-normal tabular-nums text-ink-soft">CPF {data.cpfMasked ?? "—"}</span>
+          <span className="block font-normal tabular-nums tracking-wide text-ink-soft">CPF {data.cpfMasked ?? "—"}</span>
           <span className="block font-normal text-ink-soft">{data.email}</span>
           <span className="block font-normal text-ink-soft">{data.whatsapp}</span>
         </ReviewRow>

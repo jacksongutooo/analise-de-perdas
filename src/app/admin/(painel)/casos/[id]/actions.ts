@@ -17,7 +17,7 @@ import { centsToDecimal } from "@/lib/format";
 import { REQUEST_REASON_VALUES } from "@/lib/options";
 import { clientIp, userAgent } from "@/lib/security";
 import { getStorage } from "@/lib/storage";
-import { ADMIN_SETTABLE_STATUSES, CPF_LOCKED_STATUSES, isDocumentStatus, type CaseStatusValue } from "@/lib/status";
+import { ADMIN_SETTABLE_STATUSES, CPF_LOCKED_STATUSES, DOCUMENT_AWAITING_REVIEW, isDocumentStatus, type CaseStatusValue } from "@/lib/status";
 
 // Todas as ações exigem sessão administrativa e respeitam a separação demo × produção.
 
@@ -266,10 +266,13 @@ async function caseDocument(caseId: string, formData: FormData) {
   return doc;
 }
 
+const cpfConfirmed = (check: string | null) => check === "match" || check === "manual_match";
+
 /**
  * Aprovar documento. Para o ComprovaBet, exige o CPF compatível (leitura automática) ou a confirmação
  * da conferência manual no próprio diálogo; CPF divergente bloqueia a aprovação.
- * Com o ComprovaBet aprovado, o caso segue para o pagamento da análise.
+ * Os demais arquivos do mesmo ComprovaBet ainda em análise são aprovados junto (arquivos com problema
+ * ou CPF divergente continuam como estão). Com o ComprovaBet aprovado, o caso segue para o pagamento.
  */
 export async function approveDocument(caseId: string, formData: FormData) {
   const admin = await requireAdmin();
@@ -277,21 +280,41 @@ export async function approveDocument(caseId: string, formData: FormData) {
   const doc = await caseDocument(caseId, formData);
   const note = text(formData, "note", 500) || text(formData, "reviewNote", 500) || null;
   const isComprovaBet = doc.category === "comprovabet";
-  let cpfData: { cpfCheck?: "manual_match"; cpfCheckNote?: string; cpfCheckedAt?: Date } = {};
+  const files: { id: string; cpfCheck: string | null }[] = [{ id: doc.id, cpfCheck: doc.cpfCheck }];
   if (isComprovaBet) {
     if (doc.cpfCheck === "mismatch") back(caseId, "erro=cpf_block", `doc-${doc.id}`);
-    if (doc.cpfCheck !== "match" && doc.cpfCheck !== "manual_match") {
-      if (formData.get("confirmCpf") !== "yes") back(caseId, "erro=cpf_confirm", `doc-${doc.id}`);
-      cpfData = { cpfCheck: "manual_match", cpfCheckNote: `CPF conferido manualmente por ${admin.name}.`, cpfCheckedAt: new Date() };
-    }
+    files.push(
+      ...(await prisma.document.findMany({
+        where: {
+          caseId,
+          category: "comprovabet",
+          id: { not: doc.id },
+          status: { in: [...DOCUMENT_AWAITING_REVIEW] },
+          OR: [{ cpfCheck: null }, { cpfCheck: { not: "mismatch" } }],
+        },
+        select: { id: true, cpfCheck: true },
+      })),
+    );
+    if (files.some((f) => !cpfConfirmed(f.cpfCheck)) && formData.get("confirmCpf") !== "yes") back(caseId, "erro=cpf_confirm", `doc-${doc.id}`);
   }
 
+  const now = new Date();
   const ops: Prisma.PrismaPromise<unknown>[] = [
-    prisma.document.update({
-      where: { id: doc.id },
-      data: { status: "valid", reviewedAt: new Date(), reviewedById: admin.id, ...cpfData, ...(note ? { reviewNote: note } : {}) },
-    }),
-    prisma.caseReview.create({ data: { caseId, adminId: admin.id, action: "document:valid", comment: note ?? doc.id } }),
+    ...files.map((f) =>
+      prisma.document.update({
+        where: { id: f.id },
+        data: {
+          status: "valid",
+          reviewedAt: now,
+          reviewedById: admin.id,
+          ...(isComprovaBet && !cpfConfirmed(f.cpfCheck)
+            ? { cpfCheck: "manual_match" as const, cpfCheckNote: `CPF conferido manualmente por ${admin.name}.`, cpfCheckedAt: now }
+            : {}),
+          ...(note && f.id === doc.id ? { reviewNote: note } : {}),
+        },
+      }),
+    ),
+    prisma.caseReview.create({ data: { caseId, adminId: admin.id, action: "document:valid", comment: note ?? files.map((f) => f.id).join(", ") } }),
   ];
   if (isComprovaBet && ["submitted", "documents_received", "additional_documents"].includes(c.status)) {
     ops.push(prisma.documentRequest.updateMany({ where: { caseId, status: "open" }, data: { status: "fulfilled", fulfilledAt: new Date() } }));

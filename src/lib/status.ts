@@ -121,6 +121,9 @@ export const DOCUMENT_STATUS_TONE: Record<DocumentStatusValue, Tone> = {
   duplicate: "warn",
 };
 
+/** Documentos ainda sem decisão da equipe (o ComprovaBet pode vir em mais de um arquivo). */
+export const DOCUMENT_AWAITING_REVIEW = ["pending", "in_review", "manual_review", "duplicate"] as const satisfies readonly DocumentStatusValue[];
+
 /** Situações em que o cliente precisa corrigir ou complementar o documento. */
 export const DOCUMENT_PROBLEM_STATUSES: readonly DocumentStatusValue[] = [
   "cpf_mismatch",

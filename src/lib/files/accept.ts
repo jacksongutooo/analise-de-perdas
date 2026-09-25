@@ -86,7 +86,12 @@ export async function acceptUpload(input: {
   const extension = extensionOf(originalName);
   const buffer = Buffer.from(await file.arrayBuffer());
   const detected = detectFileType(buffer, extension);
-  if (!detected.ok) return { ok: false, status: 415, error: detected.error };
+  if (!detected.ok) {
+    // Com formatos restritos (ex.: ComprovaBet), a mensagem genérica listaria formatos que não valem aqui.
+    const generic = detected.error.startsWith("Formato não aceito") || detected.error.startsWith("Não foi possível reconhecer");
+    const error = generic && input.allowedKinds ? (input.allowedKindsError ?? "Formato não aceito para este documento.") : detected.error;
+    return { ok: false, status: 415, error };
+  }
   if (input.allowedKinds && !input.allowedKinds.includes(detected.kind)) {
     return { ok: false, status: 415, error: input.allowedKindsError ?? "Formato não aceito para este documento." };
   }

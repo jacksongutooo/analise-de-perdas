@@ -1,11 +1,14 @@
 # Análise de Perdas — análise documental de perdas em apostas online
 
 Site responsivo (mobile first) para receber, organizar e analisar solicitações de pessoas que tiveram
-perdas em apostas esportivas ou cassino online. O cliente responde um formulário curto em 7 etapas,
-envia os históricos das plataformas e acompanha o caso por protocolo. A equipe trabalha em um painel
-administrativo com leitura automática dos documentos, conferência de valores e solicitação de documentos.
+perdas em apostas esportivas ou cassino online. O documento principal da análise é o **ComprovaBet anual
+de 2025**, em nome do próprio solicitante: o cliente responde um formulário curto, informa o CPF, envia o
+ComprovaBet, passa pela validação documental, paga a análise e acompanha o caso por protocolo. A equipe
+trabalha em um painel administrativo com conferência do CPF, ações rápidas com confirmação, leitura
+automática dos documentos, conferência de valores e solicitação de documentos complementares.
 
-> O site **não promete recuperação de valores** e não usa números, depoimentos ou contadores fictícios.
+> O site **não promete recuperação, restituição ou indenização**, não se apresenta como serviço oficial
+> ou governamental e não usa números, depoimentos ou contadores fictícios.
 
 ## Stack
 
@@ -59,9 +62,25 @@ npm run db:seed
 npm run dev
 ```
 
-O seed cria 7 casos fictícios (protocolos `DEMO-100001` a `DEMO-100007`) em todos os status, com
-documentos CSV gerados, uma divergência (declarado R$ 30.000,00 × identificado R$ 18.500,00) e um pedido
-de documentos adicionais. Acesso: `demo@example.com` / `demonstracao-2026` (ou `DEMO_ADMIN_PASSWORD`).
+O seed cria 11 casos fictícios (protocolos `DEMO-100001` a `DEMO-100011`), um para cada etapa do fluxo.
+Os ComprovaBets são PDFs gerados na hora, marcados como **DOCUMENTO FICTÍCIO**, com CPFs fictícios
+(`000.000.0XX-XX`), e passam pela mesma leitura de CPF dos envios reais:
+
+| Protocolo | Situação |
+|---|---|
+| `DEMO-100001` | Validação documental — CPF compatível (leitura automática) |
+| `DEMO-100007` | Validação documental — CPF mascarado no documento: aguardando conferência documental |
+| `DEMO-100008` | CPF divergente marcado pela equipe — documento em nome de outra pessoa |
+| `DEMO-100003` | Complemento solicitado — ComprovaBet de outro ano (período incorreto) |
+| `DEMO-100002` | Documento aprovado — aguardando pagamento |
+| `DEMO-100009` | Condições aceitas e pagamento informado — em confirmação pela equipe |
+| `DEMO-100010` | Pagamento confirmado — pronto para iniciar a análise |
+| `DEMO-100004` | Análise em andamento, com complemento enviado durante a análise |
+| `DEMO-100005` / `DEMO-100006` | Análise concluída (elementos insuficientes / concluída com valor validado) |
+| `DEMO-100011` | Caso anterior ao ComprovaBet (sem CPF e sem etapa de pagamento) |
+
+Acesso ao painel: `demo@example.com` / `demonstracao-2026` (ou `DEMO_ADMIN_PASSWORD`). Acompanhamento do
+cliente: protocolo + e-mail da tabela exibida pelo seed.
 
 Com `DEMO_MODE=true` o site exibe a faixa **DEMO MODE** e passa a enxergar **somente** dados de
 demonstração; com `DEMO_MODE=false`, somente dados reais. Os dois conjuntos nunca aparecem juntos, e os
@@ -86,13 +105,58 @@ Fotos maiores são reduzidas no próprio navegador antes do envio. Em servidor p
 
 ## Fluxo do cliente
 
-- `/` — página inicial curta, com o que ter em mãos.
-- `/analise` — formulário em 7 etapas, com barra de progresso, “Voltar”, salvamento automático no navegador
-  (“✓ Informações salvas”) e retomada de onde parou. Após a etapa 7 há os dados de contato e a revisão
-  “Confira sua solicitação”.
-- `/analise/recebida` — protocolo `ANL-XXXXXX` e prazo máximo estimado.
-- `/acompanhar` — acesso com protocolo + e-mail: status, linha do tempo, valores e prazo.
-- `/acompanhar/documentos` — envio de documentação adicional quando a equipe solicitar.
+Cadastro → CPF do solicitante → envio do ComprovaBet → validação documental → pagamento da análise →
+análise pela equipe → acompanhamento pelo painel.
+
+- `/` — página inicial curta, com o que ter em mãos (CPF, ComprovaBet, e-mail e WhatsApp).
+- `/analise` — formulário em etapas curtas, com barra de progresso, “Voltar”, salvamento automático no navegador
+  (“✓ Informações salvas”) e retomada de onde parou. A etapa 6 traz os dados do solicitante com o **CPF**
+  (máscara `000.000.000-00` e dígitos verificadores); a etapa 7 é o envio do **ComprovaBet**; depois vêm o
+  compromisso voluntário e a revisão “Confira sua solicitação”.
+- `/analise/recebida` — protocolo `ANL-XXXXXX` e próximos passos.
+- `/acompanhar` — acesso com protocolo + e-mail: etapa atual, linha do tempo em 6 etapas (Cadastro realizado ·
+  ComprovaBet enviado · Validação documental · Pagamento confirmado · Análise em andamento · Análise concluída),
+  situação do documento, valores e prazo.
+- `/acompanhar/documentos` — envio de documentação complementar quando a equipe solicitar (inclusive um novo ComprovaBet).
+- `/acompanhar/pagamento` — liberado depois da validação documental: aviso “Importante”, aceite obrigatório das
+  condições (registrado com data, hora e versão) e, em seguida, o link de pagamento ou as instruções da equipe.
+
+## ComprovaBet e CPF
+
+- O CPF é validado no navegador e no servidor. Ele é registrado no rascunho **antes** do envio do documento
+  e não fica salvo no navegador (só a versão mascarada, `***.***.***-25`). Depois do envio do ComprovaBet,
+  o cliente não pode mais trocar o CPF; no painel, só o perfil `admin` corrige, com motivo, e apenas antes
+  de a análise documental avançar.
+- Arquivos aceitos: **PDF** (preferencial), JPG e PNG, até 5 por envio, com o limite de tamanho de `MAX_UPLOAD_MB`.
+  O tipo é conferido pelo conteúdo real do arquivo (não pela extensão).
+- **Conferência automática do CPF** (`src/lib/documents/comprovabet-check.ts`): só acontece quando o PDF tem
+  texto selecionável. O texto é lido (até 10 páginas), os CPFs são normalizados (só os 11 dígitos) e comparados:
+  - CPF cadastrado encontrado → **CPF compatível**;
+  - outro CPF completo e válido, sem o cadastrado → **CPF divergente**: o envio é recusado com a mensagem
+    “O CPF identificado no documento não corresponde ao CPF informado no cadastro. Confira os dados e envie o
+    documento correto.” e o arquivo **não é armazenado**;
+  - imagem, PDF digitalizado, PDF protegido, CPF mascarado ou ausente → **Aguardando conferência documental**
+    (a equipe confere manualmente). O sistema nunca informa uma validação automática que não aconteceu.
+- A leitura também anota os anos citados no documento, para a equipe conferir o período.
+- **Nenhum documento é aprovado só por ter sido enviado**: a aprovação é sempre da equipe, e um ComprovaBet com
+  CPF divergente não pode ser aprovado.
+
+## Pagamento da análise
+
+O projeto não traz um gateway de pagamento. Depois que a equipe aprova o ComprovaBet, o caso vai para
+“Aguardando pagamento” e o cliente vê a etapa de pagamento no acompanhamento:
+
+1. aviso “Importante”: o pagamento refere-se exclusivamente ao serviço de análise e não garante recuperação,
+   restituição, indenização ou recebimento de valores;
+2. checkbox obrigatório de aceite das condições — o botão só funciona depois de marcado; o aceite é gravado em
+   `service_agreements` (data e hora, versão dos termos, texto aceito, IP e navegador);
+3. link de pagamento (`PAYMENT_URL`, opcional) ou aviso de que a equipe enviará as instruções, e o botão
+   “Já fiz o pagamento” (status **Pagamento em confirmação**);
+4. a equipe confere o recebimento e clica em **Confirmar pagamento** no painel. O prazo estimado da análise
+   (`REVIEW_DAYS`) passa a contar a partir daí.
+
+Para integrar um gateway, basta marcar o pagamento como confirmado (mesmos campos de `confirmPayment`) a partir
+do webhook do provedor.
 
 ## Os três valores (nunca se misturam)
 
@@ -106,9 +170,24 @@ Divergências relevantes (a partir de R$ 100 e 2% do declarado) aparecem no caso
 
 ## Status
 
-`submitted` (Solicitação recebida) · `documents_received` (Documentos recebidos) · `under_review` (Em análise) ·
-`additional_documents` (Documentação adicional necessária) · `eligible` (Caso com possibilidade de prosseguimento) ·
-`not_eligible` (Elementos insuficientes para prosseguir) · `completed` (Análise concluída).
+**Caso:** `submitted` (Solicitação recebida) · `documents_received` (Validação documental) ·
+`additional_documents` (Documentação complementar necessária) · `awaiting_payment` (Aguardando pagamento) ·
+`payment_confirmed` (Pagamento confirmado) · `under_review` (Análise em andamento) ·
+`eligible` (Caso com possibilidade de prosseguimento) · `not_eligible` (Elementos insuficientes para prosseguir) ·
+`completed` (Análise concluída).
+
+**Documento:** Aguardando análise · Documento em análise · Documento aprovado · CPF divergente ·
+Documento inconsistente · Documento inválido · Documento ilegível · Documentação complementar necessária ·
+Aguardando conferência manual · Possível duplicidade.
+
+**Conferência do CPF (equipe):** Aguardando conferência documental · CPF compatível · CPF divergente · CPF conferido pela equipe.
+
+**Pagamento:** Pagamento pendente · Pagamento em confirmação · Pagamento confirmado · Não se aplica (casos anteriores
+ao ComprovaBet, que seguem sem a etapa de pagamento).
+
+**Ações rápidas no painel** (todas com diálogo de confirmação): Aprovar documento · CPF divergente · Solicitar
+complemento · Documento inválido · Confirmar pagamento · Iniciar análise · Concluir análise. Nas ações de problema,
+a equipe escolhe os motivos e escreve a orientação que aparece para o cliente.
 
 ## Leitura automática dos documentos
 
@@ -142,7 +221,11 @@ Toda exportação e exclusão fica registrada.
   de arquivos com extensão trocada; limite de tamanho e de quantidade por caso.
 - Senhas com scrypt, sessões administrativas no banco (12 h), cookies `httpOnly`, limite de tentativas de
   login e de consulta por protocolo, verificação de origem nos envios.
-- Registro do compromisso voluntário (aceite, data, IP e navegador) e do consentimento LGPD.
+- Registro do compromisso voluntário (aceite, data, IP e navegador), do consentimento LGPD e do aceite das
+  condições do serviço antes do pagamento.
+- CPF tratado como dado pessoal: mascarado nas listas, no acompanhamento e nas respostas da API; o número completo
+  só aparece no painel autorizado, sob demanda (“Mostrar”), e cada visualização é registrada. O CPF nunca é
+  gravado nos registros de acesso. Documento com CPF de outra pessoa é recusado sem ser armazenado.
 - Cabeçalhos de segurança e CSP em produção (`next.config.ts`); áreas privadas com `noindex`.
 - O site nunca pede senhas, códigos SMS ou códigos de autenticação.
 
@@ -152,8 +235,10 @@ Toda exportação e exclusão fica registrada.
 npm test
 ```
 
-Cobrem formatação de valores, cálculo da perda, validação do formulário no servidor, regras de divergência e de
-andamento, senhas, validação do conteúdo dos arquivos e a leitura automática de CSV, XLSX e PDF.
+Cobrem formatação de valores, cálculo da perda, validação do formulário no servidor, CPF (dígitos verificadores,
+máscaras, busca no texto e conferência de PDFs com CPF igual, divergente, mascarado ou ausente), linha do tempo
+em 6 etapas, regras de divergência e de andamento, senhas, validação do conteúdo dos arquivos e a leitura
+automática de CSV, XLSX e PDF.
 
 ## Antes de publicar
 
@@ -164,6 +249,9 @@ andamento, senhas, validação do conteúdo dos arquivos e a leitura automática
 - [ ] Usar `AUTH_SECRET` e `CRON_SECRET` fortes e exclusivos de produção.
 - [ ] Confirmar que o bucket está privado e com backup/versionamento conforme a política de retenção.
 - [ ] Testar a leitura automática com históricos reais de cada plataforma e ajustar as regras se necessário.
+- [ ] Testar a conferência do CPF com ComprovaBets reais (PDF com texto) e conferir `COMPROVABET_YEAR`.
+- [ ] Definir o pagamento: `ANALYSIS_PRICE`, `PAYMENT_URL` (ou as instruções enviadas pela equipe) e revisar o texto
+      das condições do serviço. Ao mudar esse texto, atualize `SERVICE_TERMS_VERSION` em `src/lib/comprovabet.ts`.
 - [ ] A etapa 7 traz uma linha discreta sobre a autoexclusão oficial (gov.br/autoexclusaoapostas).
       Remova em `src/components/analysis/steps.tsx` se não fizer sentido para a operação.
 

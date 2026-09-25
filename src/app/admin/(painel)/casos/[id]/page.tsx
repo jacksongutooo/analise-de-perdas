@@ -38,6 +38,7 @@ import {
   CPF_CHECK_LABEL,
   CPF_CHECK_TONE,
   CPF_LOCKED_STATUSES,
+  DOCUMENT_AWAITING_REVIEW,
   DOCUMENT_STATUS_LABEL,
   DOCUMENT_STATUS_TONE,
   DOCUMENT_STATUS_VALUES,
@@ -189,13 +190,17 @@ function ComprovaBetActions({
   doc,
   caseId,
   cpfMasked,
+  others,
 }: {
   doc: ComprovaBetDoc;
   caseId: string;
   cpfMasked: string;
+  /** Outros arquivos do mesmo ComprovaBet ainda em análise: são aprovados junto. */
+  others: { name: string; cpfCheck: string | null }[];
 }) {
   const hidden = { documentId: doc.id };
-  const cpfConfirmed = doc.cpfCheck === "match" || doc.cpfCheck === "manual_match";
+  const confirmed = (check: string | null) => check === "match" || check === "manual_match";
+  const cpfConfirmed = confirmed(doc.cpfCheck) && others.every((o) => confirmed(o.cpfCheck));
   return (
     <>
       <ConfirmDialog
@@ -213,6 +218,11 @@ function ComprovaBetActions({
           <>
             <p>O cliente verá “Documento analisado” e o caso segue para o pagamento da análise.</p>
             {doc.cpfCheck === "match" && <p className="font-medium text-ok-700">Leitura automática: CPF compatível.</p>}
+            {others.length > 0 && (
+              <p>
+                Os outros arquivos do ComprovaBet em análise também serão aprovados: <span className="break-all">{others.map((o) => o.name).join(", ")}</span>.
+              </p>
+            )}
           </>
         }
       >
@@ -220,7 +230,7 @@ function ComprovaBetActions({
           <label className="flex items-start gap-2.5 rounded-xl border border-warn-700/25 bg-warn-50 p-3 text-sm text-ink">
             <input type="checkbox" name="confirmCpf" value="yes" required className="mt-0.5 size-4 shrink-0 accent-navy-900" />
             <span>
-              Conferi manualmente que o CPF do documento corresponde ao CPF cadastrado ({cpfMasked}).
+              Conferi manualmente que o CPF {others.length > 0 ? "dos arquivos" : "do documento"} corresponde ao CPF cadastrado ({cpfMasked}).
             </span>
           </label>
         )}
@@ -343,6 +353,10 @@ export default async function CasePage({
   const primaryStatus = primary ? (primary.status as DocumentStatusValue) : null;
   const primaryCpf = primary?.cpfCheck ? (primary.cpfCheck as CpfCheckValue) : null;
   const primaryDetails = (primary?.checkDetails ?? null) as { yearsMentioned?: number[]; referenceYearMentioned?: boolean | null } | null;
+  const othersAwaiting = (docId: string) =>
+    comprovabetDocs
+      .filter((d) => d.id !== docId && (DOCUMENT_AWAITING_REVIEW as readonly string[]).includes(d.status) && d.cpfCheck !== "mismatch")
+      .map((d) => ({ name: d.originalName, cpfCheck: d.cpfCheck }));
   const cpfMasked = c.user.cpf ? maskCpf(c.user.cpf) : "—";
   const cpfLocked = CPF_LOCKED_STATUSES.includes(status) || comprovabetDocs.some((d) => d.status === "valid");
   const agreement = c.agreements[0] ?? null;
@@ -363,7 +377,8 @@ export default async function CasePage({
             {c.isDemo && <Badge tone="warn">DEMO</Badge>}
           </div>
           <p className="mt-1 text-sm text-muted">
-            Recebido em {formatDateTime(c.createdAt)} · prazo até {formatDate(c.reviewDeadline)}
+            Recebido em {formatDateTime(c.createdAt)} ·{" "}
+            {legacy || payment === "confirmed" ? `prazo até ${formatDate(c.reviewDeadline)}` : "prazo conta a partir do pagamento"}
           </p>
         </div>
         <form action={bind(assignCase)} className="flex items-end gap-2">
@@ -485,7 +500,7 @@ export default async function CasePage({
           <p className="text-xs font-semibold uppercase tracking-wider text-muted">Ações rápidas</p>
           <div className="mt-3 flex flex-wrap gap-2">
             {primary ? (
-              <ComprovaBetActions doc={primary} caseId={c.id} cpfMasked={cpfMasked} />
+              <ComprovaBetActions doc={primary} caseId={c.id} cpfMasked={cpfMasked} others={othersAwaiting(primary.id)} />
             ) : (
               <ConfirmDialog
                 label="Solicitar complemento"
@@ -880,7 +895,7 @@ export default async function CasePage({
                       <IconEye size={15} /> Visualizar
                     </a>
                     {isComprovaBet ? (
-                      <ComprovaBetActions doc={doc} caseId={c.id} cpfMasked={cpfMasked} />
+                      <ComprovaBetActions doc={doc} caseId={c.id} cpfMasked={cpfMasked} others={othersAwaiting(doc.id)} />
                     ) : (
                       <>
                         <form action={setStatus}>
