@@ -34,6 +34,10 @@ enum CaseStatus {
   documents_received
   under_review
   additional_documents
+  preliminary_review
+  waiting_payment
+  payment_confirmed
+  full_review
   eligible
   not_eligible
   completed
@@ -103,6 +107,25 @@ enum RequestStatus {
   cancelled
 
   @@map("request_status")
+}
+
+enum PaymentMethod {
+  pix
+  standard
+
+  @@map("payment_method")
+}
+
+enum PaymentStatus {
+  pending
+  processing
+  paid
+  failed
+  expired
+  refunded
+  cancelled
+
+  @@map("payment_status")
 }
 
 model User {
@@ -336,7 +359,8 @@ model StatusHistory {
   changedById   String?     @map("changed_by_id")
   publicMessage String?     @map("public_message")
   createdAt     DateTime    @default(now()) @map("created_at")
-
+  status                CaseStatus   @default(submitted)
+  preliminaryIndex      Int          @default(0) @map("preliminary_index")
   case      Case       @relation(fields: [caseId], references: [id], onDelete: Cascade)
   changedBy AdminUser? @relation(fields: [changedById], references: [id])
 
@@ -345,6 +369,9 @@ model StatusHistory {
 }
 
 model VoluntaryCommitment {
+  fullReviewStartedAt   DateTime?    @map("full_review_started_at")
+  estimatedMinDate      DateTime?    @map("estimated_min_date")
+  estimatedMaxDate      DateTime?    @map("estimated_max_date")
   id          String   @id @default(cuid())
   caseId      String   @unique @map("case_id")
   accepted    Boolean  @map("aceite_pausa")
@@ -363,6 +390,27 @@ model VoluntaryCommitment {
 model DocumentRequest {
   id            String        @id @default(cuid())
   caseId        String        @map("case_id")
+
+model Payment {
+  id                 String        @id @default(cuid())
+  caseId             String        @unique @map("case_id")
+  termsAccepted      Boolean       @map("terms_accepted")
+  termsAcceptedAt    DateTime      @map("terms_accepted_at")
+  originalAmount     Decimal       @map("original_amount") @db.Decimal(14, 2)
+  discountPercentage Decimal       @default(0) @map("discount_percentage") @db.Decimal(5, 2)
+  finalAmount        Decimal       @map("final_amount") @db.Decimal(14, 2)
+  paymentMethod      PaymentMethod @map("payment_method")
+  status             PaymentStatus  @default(pending)
+  transactionId      String?       @unique @map("transaction_id")
+  paidAt             DateTime?     @map("paid_at")
+  createdAt          DateTime      @default(now()) @map("created_at")
+  updatedAt          DateTime      @updatedAt @map("updated_at")
+
+  case Case @relation(fields: [caseId], references: [id], onDelete: Cascade)
+
+  @@index([status])
+  @@map("payments")
+}
   reasons       String[]      @default([])
   message       String?
   status        RequestStatus @default(open)
