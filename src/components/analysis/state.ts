@@ -1,7 +1,7 @@
 // Estado do formulário em etapas: telas, validação por etapa, cálculo e salvamento automático.
 import { isValidCpf } from "@/lib/cpf";
 import { isValidEmail, normalizePhoneBR } from "@/lib/format";
-import { PLATFORMS, type BetTypeValue, type PeriodValue, type SituationValue } from "@/lib/options";
+import { PLATFORMS, situationValuesFor, type BetTypeValue, type ControlLossValue, type PeriodValue, type SituationValue } from "@/lib/options";
 
 export type Screen =
   | "type"
@@ -10,6 +10,7 @@ export type Screen =
   | "period"
   | "amounts"
   | "balance"
+  | "control"
   | "situation"
   | "documents"
   | "commitment"
@@ -29,6 +30,7 @@ export const SCREENS: { id: Screen; step: number | null; label?: string }[] = [
   { id: "period", step: 3 },
   { id: "amounts", step: 4 },
   { id: "balance", step: 4 },
+  { id: "control", step: 5 },
   { id: "situation", step: 5 },
   { id: "contact", step: 6 },
   { id: "documents", step: 7 },
@@ -49,6 +51,8 @@ export type WizardData = {
   withdrawalsCents: number | null;
   hasBalance: boolean | null;
   balanceCents: number | null;
+  /** Etapa 5: as apostas saíram do controle? */
+  controlLoss: ControlLossValue | null;
   situations: SituationValue[];
   situationOther: string;
   privacyConsent: boolean;
@@ -76,6 +80,7 @@ export const EMPTY_DATA: WizardData = {
   withdrawalsCents: null,
   hasBalance: null,
   balanceCents: null,
+  controlLoss: null,
   situations: [],
   situationOther: "",
   privacyConsent: false,
@@ -130,6 +135,12 @@ export function comprovabetFiles(files: DraftFile[]): DraftFile[] {
   return files.filter((f) => f.category === "comprovabet");
 }
 
+/** Situações marcadas que valem para a resposta atual sobre o controle das apostas. */
+export function currentSituations(d: WizardData): SituationValue[] {
+  const allowed = situationValuesFor(d.controlLoss);
+  return d.situations.filter((s) => allowed.includes(s));
+}
+
 /** Perda declarada = depósitos − saques − saldo disponível (negativo vira zero e é sinalizado). */
 export function declaredLoss(d: WizardData): { raw: number; loss: number; needsReview: boolean } {
   const raw = (d.depositsCents ?? 0) - (d.withdrawalsCents ?? 0) - (d.hasBalance ? (d.balanceCents ?? 0) : 0);
@@ -169,9 +180,14 @@ export function screenError(screen: Screen, d: WizardData, ctx: { fileCount: num
     case "balance":
       if (d.hasBalance === null) return "Informe se ainda existe saldo nas plataformas.";
       return d.hasBalance && !(d.balanceCents && d.balanceCents > 0) ? "Informe o saldo aproximado." : null;
-    case "situation":
-      if (!d.situations.length) return "Escolha ao menos uma opção.";
-      return d.situations.includes("other") && !d.situationOther.trim() ? "Descreva a situação em poucas palavras." : null;
+    case "control":
+      return d.controlLoss ? null : "Escolha uma opção para continuar.";
+    case "situation": {
+      if (!d.controlLoss) return "Volte e responda se as apostas saíram do seu controle.";
+      const chosen = currentSituations(d);
+      if (!chosen.length) return "Escolha ao menos uma opção.";
+      return chosen.includes("other") && !d.situationOther.trim() ? "Descreva a situação em poucas palavras." : null;
+    }
     case "documents":
       if (!d.privacyConsent) return "Para enviar documentos, marque a autorização de tratamento dos dados.";
       if (ctx.busy) return "Aguarde o envio dos arquivos terminar.";
@@ -198,6 +214,7 @@ export const FIELD_SCREEN: Record<string, Screen> = {
   withdrawalsCents: "amounts",
   hasBalance: "balance",
   balanceCents: "balance",
+  controlLoss: "control",
   situations: "situation",
   situationOther: "situation",
   privacyConsent: "documents",
@@ -224,8 +241,9 @@ export function buildPayload(d: WizardData) {
     withdrawalsCents: d.withdrawalsCents ?? 0,
     hasBalance: d.hasBalance === true,
     balanceCents: d.hasBalance ? d.balanceCents : null,
-    situations: d.situations,
-    situationOther: d.situations.includes("other") ? d.situationOther.trim() : "",
+    controlLoss: d.controlLoss,
+    situations: currentSituations(d),
+    situationOther: currentSituations(d).includes("other") ? d.situationOther.trim() : "",
     privacyConsent: d.privacyConsent,
     commitment: d.commitment,
     fullName: d.fullName.trim().replace(/\s+/g, " "),

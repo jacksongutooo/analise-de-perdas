@@ -8,6 +8,7 @@ import { decimalToCents } from "@/lib/format";
 import {
   BET_TYPE_SUMMARY,
   CASINO_GAMES,
+  CONTROL_LOSS_SUMMARY,
   DOC_CATEGORIES,
   MAIN_LOSS_AREAS,
   PERIODS,
@@ -89,6 +90,7 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
       detalhe: detail,
       plataformas: c.platforms.map((p) => p.platform.name),
       tempoDeUso: labelFor(PERIODS, c.period),
+      controleDasApostas: c.controlLoss ? CONTROL_LOSS_SUMMARY[c.controlLoss] : null,
       situacoes: c.situations.map((s) => labelFor(SITUATIONS, s)),
       situacaoDescrita: c.situationOther,
     },

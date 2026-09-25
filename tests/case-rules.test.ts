@@ -7,6 +7,7 @@ import {
   buildPayload,
   comprovabetFiles,
   contactErrors,
+  currentSituations,
   declaredLoss,
   loadProgress,
   resumeScreen,
@@ -17,6 +18,7 @@ import {
 } from "@/components/analysis/state";
 import { resolvePlatforms } from "@/lib/cases/platforms";
 import { submissionSchema } from "@/lib/cases/submission";
+import { situationValuesFor } from "@/lib/options";
 import { generateProtocol, normalizeProtocol } from "@/lib/protocol";
 import { hashPassword, verifyPassword } from "@/lib/security";
 import { clientCpfLabel, clientDocumentLabel, clientTimeline, divergenceOf } from "@/lib/status";
@@ -33,7 +35,8 @@ const filled: WizardData = {
   withdrawalsCents: 1000000,
   hasBalance: true,
   balanceCents: 50000,
-  situations: ["losses"],
+  controlLoss: "yes",
+  situations: ["chasing_losses", "borrowed_money"],
   privacyConsent: true,
   commitment: true,
   fullName: " Ana  Souza ",
@@ -59,6 +62,21 @@ describe("formulário", () => {
     ];
     assert.deepEqual(attachedFiles(files, selectedPlatformNames(filled)).map((f) => f.id), ["1", "3"]);
     assert.deepEqual(comprovabetFiles(files).map((f) => f.id), ["4"]);
+  });
+
+  test("etapa 5: as opções dependem da resposta sobre o controle das apostas", () => {
+    const order = SCREENS.map((s) => s.id);
+    assert.equal(order.indexOf("control") + 1, order.indexOf("situation"));
+    assert.ok(situationValuesFor("yes").includes("chasing_losses"));
+    assert.ok(situationValuesFor("sometimes").includes("borrowed_money"));
+    assert.ok(!situationValuesFor("yes").includes("withdrawal_not_done"));
+    assert.ok(situationValuesFor("no").includes("withdrawal_not_done"));
+    assert.ok(!situationValuesFor("no").includes("chasing_losses"));
+    // Ao trocar a resposta, as marcações da outra lista deixam de valer (e não são enviadas).
+    const switched: WizardData = { ...filled, controlLoss: "no", situations: ["chasing_losses", "withdrawal_not_done"] };
+    assert.deepEqual(currentSituations(switched), ["withdrawal_not_done"]);
+    assert.deepEqual(buildPayload(switched).situations, ["withdrawal_not_done"]);
+    assert.equal(screenError("situation", { ...filled, controlLoss: "no" }, { fileCount: 1, busy: false }), "Escolha ao menos uma opção.");
   });
 
   test("os dados do solicitante (com CPF) vêm antes do envio do ComprovaBet", () => {
@@ -96,7 +114,7 @@ describe("formulário", () => {
 
   test("validação de cada tela", () => {
     const ctx = { fileCount: 1, busy: false };
-    for (const s of ["type", "typeDetail", "platforms", "period", "amounts", "balance", "situation", "contact", "documents", "commitment", "review"] as const) {
+    for (const s of ["type", "typeDetail", "platforms", "period", "amounts", "balance", "control", "situation", "contact", "documents", "commitment", "review"] as const) {
       assert.equal(screenError(s, filled, ctx), null, s);
     }
     assert.equal(screenError("documents", filled, { fileCount: 0, busy: false }), "Envie o seu ComprovaBet para continuar.");
@@ -104,12 +122,15 @@ describe("formulário", () => {
     assert.equal(screenError("documents", { ...filled, privacyConsent: false }, ctx), "Para enviar documentos, marque a autorização de tratamento dos dados.");
     assert.equal(screenError("typeDetail", { ...filled, betType: "casino", casinoGames: [] }, ctx), "Escolha ao menos um jogo.");
     assert.equal(screenError("balance", { ...filled, balanceCents: null }, ctx), "Informe o saldo aproximado.");
+    assert.equal(screenError("control", { ...filled, controlLoss: null }, ctx), "Escolha uma opção para continuar.");
+    assert.equal(screenError("situation", { ...filled, situations: [] }, ctx), "Escolha ao menos uma opção.");
     assert.equal(screenError("contact", { ...filled, fullName: "Ana" }, ctx), "Informe seu nome completo.");
     assert.equal(screenError("contact", { ...filled, cpf: "123.456.789-00" }, ctx), "CPF inválido. Confira os números.");
   });
 
   test("retomada volta para a primeira etapa incompleta", () => {
     assert.equal(resumeScreen("review", { ...filled, period: null }), "period");
+    assert.equal(resumeScreen("review", { ...filled, controlLoss: null }), "control");
     assert.equal(resumeScreen("contact", filled), "contact");
     // Sem o CPF registrado no servidor, a retomada volta para os dados do solicitante.
     assert.equal(resumeScreen("review", { ...filled, cpf: "", cpfMasked: null }), "contact");
@@ -137,6 +158,8 @@ describe("formulário", () => {
     assert.equal(firstIssuePath({ whatsapp: "123" }), "whatsapp");
     assert.equal(firstIssuePath({ commitment: false }), "commitment");
     assert.equal(firstIssuePath({ privacyConsent: false }), "privacyConsent");
+    assert.equal(firstIssuePath({ controlLoss: null }), "controlLoss");
+    assert.equal(firstIssuePath({ controlLoss: "no", situations: ["chasing_losses"] }), "situations");
     assert.equal(firstIssuePath({ isAdult: false }), "isAdult");
     assert.equal(firstIssuePath({ depositsCents: 0 }), "depositsCents");
     assert.equal(firstIssuePath({ withdrawalsCents: -5 }), "withdrawalsCents");

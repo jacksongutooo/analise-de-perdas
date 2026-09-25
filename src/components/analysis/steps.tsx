@@ -9,19 +9,26 @@ import {
   BET_TYPES,
   BET_TYPE_SUMMARY,
   CASINO_GAMES,
+  CONTROL_LOSS,
+  CONTROL_LOSS_SUMMARY,
+  GAMBLING_SUPPORT_NOTE,
   MAIN_LOSS_AREAS,
   PERIODS,
   PLATFORMS,
   SITUATIONS,
   SPORTS_KINDS,
   commitmentText,
+  labelFor,
+  lostControl,
+  situationValuesFor,
   type BetTypeValue,
+  type ControlLossValue,
 } from "@/lib/options";
 import { MoneyInput } from "../MoneyInput";
 import { IconCheck, IconDice, IconLayers, IconPlus, IconTrophy, IconX } from "../icons";
 import { Field, LedgerRow, Notice, TextInput } from "../ui";
 import { ChoiceCard } from "./ChoiceCard";
-import { contactErrors, declaredLoss, type Screen, type WizardData } from "./state";
+import { contactErrors, currentSituations, declaredLoss, type Screen, type WizardData } from "./state";
 
 type HeadingRef = RefObject<HTMLHeadingElement | null>;
 type Update = (patch: Partial<WizardData>) => void;
@@ -285,18 +292,52 @@ export function BalanceStep({ data, update, headingRef }: { data: WizardData; up
 }
 
 // ─── Etapa 5 ──────────────────────────────────────────────────────────────
+export function ControlStep({ data, update, headingRef }: { data: WizardData; update: Update; headingRef: HeadingRef }) {
+  const choose = (value: ControlLossValue) => {
+    // Ao mudar a resposta, ficam só as situações que continuam valendo.
+    const allowed = situationValuesFor(value);
+    update({ controlLoss: value, situations: data.situations.filter((s) => allowed.includes(s)) });
+  };
+  return (
+    <>
+      <StepHeading
+        headingRef={headingRef}
+        id="q-control"
+        title="As apostas saíram do seu controle?"
+        subtitle="Sua resposta ajuda a entender o seu caso e fica restrita à equipe de análise."
+      />
+      <div role="radiogroup" aria-labelledby="q-control" className="space-y-3">
+        {CONTROL_LOSS.map((o) => (
+          <ChoiceCard key={o.value} selected={data.controlLoss === o.value} onSelect={() => choose(o.value)} title={o.label} description={o.description} />
+        ))}
+      </div>
+      {lostControl(data.controlLoss) && (
+        <p className="step-in mt-6 rounded-2xl border border-navy-100 bg-navy-50 px-5 py-4 text-[0.95rem] leading-relaxed text-ink">
+          {GAMBLING_SUPPORT_NOTE}
+        </p>
+      )}
+    </>
+  );
+}
+
 export function SituationStep({ data, update, headingRef }: { data: WizardData; update: Update; headingRef: HeadingRef }) {
   const toggle = (value: WizardData["situations"][number]) =>
     update({ situations: data.situations.includes(value) ? data.situations.filter((s) => s !== value) : [...data.situations, value] });
+  const options = situationValuesFor(data.controlLoss).map((value) => SITUATIONS.find((s) => s.value === value)!);
   return (
     <>
-      <StepHeading headingRef={headingRef} id="q-situation" title="Qual situação melhor representa seu caso?" subtitle="Você pode marcar mais de uma." />
+      <StepHeading
+        headingRef={headingRef}
+        id="q-situation"
+        title={lostControl(data.controlLoss) ? "O que aconteceu com você?" : "O que aconteceu?"}
+        subtitle="Marque tudo o que se aplica."
+      />
       <div role="group" aria-labelledby="q-situation" className="space-y-2.5">
-        {SITUATIONS.map((s) => (
+        {options.map((s) => (
           <ChoiceCard key={s.value} compact multiple selected={data.situations.includes(s.value)} onSelect={() => toggle(s.value)} title={s.label} />
         ))}
       </div>
-      {data.situations.includes("other") && (
+      {currentSituations(data).includes("other") && (
         <div className="step-in mt-5">
           <Field label="Descreva em poucas palavras" htmlFor="situation-other" hint={`${data.situationOther.length}/140 caracteres`}>
             <TextInput
@@ -521,6 +562,14 @@ export function ReviewStep({
             <span className="tabular-nums">{formatBRL(data.balanceCents ?? 0)}</span>
           </ReviewRow>
         )}
+        <ReviewRow label="O que aconteceu" onEdit={() => goTo("control")}>
+          <span className="block">{data.controlLoss ? CONTROL_LOSS_SUMMARY[data.controlLoss] : "—"}</span>
+          {currentSituations(data).map((s) => (
+            <span key={s} className="block text-sm font-normal text-ink-soft">
+              {s === "other" && data.situationOther.trim() ? `Outro: ${data.situationOther.trim()}` : labelFor(SITUATIONS, s)}
+            </span>
+          ))}
+        </ReviewRow>
         <ReviewRow label="Perda líquida declarada">
           <span className="text-xl font-semibold tabular-nums">{formatBRL(loss)}</span>
           <span className="block text-xs font-normal text-muted">Estimativa baseada nos valores informados.</span>

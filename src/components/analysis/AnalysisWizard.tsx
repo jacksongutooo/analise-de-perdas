@@ -32,6 +32,7 @@ import {
   BalanceStep,
   CommitmentStep,
   ContactStep,
+  ControlStep,
   PeriodStep,
   PlatformsStep,
   ReviewStep,
@@ -370,6 +371,8 @@ export function AnalysisWizard({ settings }: { settings: WizardSettings }) {
         return <AmountsStep {...common} year={year} />;
       case "balance":
         return <BalanceStep {...common} />;
+      case "control":
+        return <ControlStep {...common} />;
       case "situation":
         return <SituationStep {...common} />;
       case "documents":

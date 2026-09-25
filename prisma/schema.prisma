@@ -30,6 +30,15 @@ enum UsagePeriod {
   @@map("usage_period")
 }
 
+/// Etapa 5: se as apostas saíram do controle (resposta do cliente). Casos anteriores ficam sem resposta.
+enum ControlLoss {
+  yes
+  sometimes
+  no
+
+  @@map("control_loss")
+}
+
 enum CaseStatus {
   submitted
   documents_received
@@ -173,6 +182,7 @@ model Case {
   casinoGames           String[]      @default([]) @map("casino_games")
   mainLossArea          String?       @map("main_loss_area")
   period                UsagePeriod
+  controlLoss           ControlLoss?  @map("control_loss")
   situations            String[]      @default([])
   situationOther        String?       @map("situation_other")
   declaredDeposits      Decimal       @map("declared_deposits") @db.Decimal(14, 2)

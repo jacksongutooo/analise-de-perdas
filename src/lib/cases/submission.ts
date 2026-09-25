@@ -3,11 +3,13 @@ import { isValidEmail, normalizePhoneBR } from "@/lib/format";
 import {
   BET_TYPE_VALUES,
   CASINO_GAME_VALUES,
+  CONTROL_LOSS_VALUES,
   MAIN_LOSS_VALUES,
   PERIOD_VALUES,
   PLATFORM_SLUGS,
   SITUATION_VALUES,
   SPORTS_KIND_VALUES,
+  situationValuesFor,
 } from "@/lib/options";
 
 // Validação no servidor de tudo o que chega do formulário. Nada é aceito sem passar por aqui.
@@ -33,6 +35,7 @@ export const submissionSchema = z
     withdrawalsCents: cents,
     hasBalance: z.boolean(),
     balanceCents: cents.nullable(),
+    controlLoss: z.enum(CONTROL_LOSS_VALUES, { errorMap: () => ({ message: "Responda se as apostas saíram do seu controle." }) }),
     situations: z.array(z.enum(SITUATION_VALUES)).min(1, "Informe a situação do seu caso.").max(SITUATION_VALUES.length),
     situationOther: z.string().trim().max(140, "Use no máximo 140 caracteres."),
     privacyConsent: z.literal(true, { errorMap: () => ({ message: "É necessário autorizar o tratamento dos dados." }) }),
@@ -50,6 +53,8 @@ export const submissionSchema = z
     const hasCustom = d.otherPlatformEnabled && d.customPlatforms.some((n) => /[\p{L}\p{N}]/u.test(n));
     if (d.platforms.length === 0 && !hasCustom) issue("platforms", "Selecione ao menos uma plataforma.");
     if (d.hasBalance && !(d.balanceCents && d.balanceCents > 0)) issue("balanceCents", "Informe o saldo aproximado.");
+    const allowed = situationValuesFor(d.controlLoss);
+    if (d.situations.some((s) => !allowed.includes(s))) issue("situations", "Revise o que aconteceu no seu caso.");
     if (d.situations.includes("other") && !d.situationOther) issue("situationOther", "Descreva a situação em poucas palavras.");
     if (d.fullName.split(/\s+/).filter(Boolean).length < 2) issue("fullName", "Informe seu nome completo.");
     if (!isValidEmail(d.email)) issue("email", "Informe um e-mail válido.");

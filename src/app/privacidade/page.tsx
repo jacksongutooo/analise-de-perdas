@@ -22,7 +22,7 @@ export default function PrivacidadePage() {
           items={[
             "Identificação e contato: nome completo, CPF, e-mail e WhatsApp.",
             "Confirmação de maioridade (18 anos ou mais).",
-            "Respostas do formulário: tipo de aposta, plataformas utilizadas, período, valores aproximados informados e situação do caso.",
+            "Respostas do formulário: tipo de aposta, plataformas utilizadas, período, valores aproximados informados e situação do caso, inclusive se as apostas saíram do seu controle. Essa informação pode dizer respeito à sua saúde: é usada apenas para a análise do caso, com o seu consentimento, e fica restrita à equipe.",
             "Documentos enviados por você, principalmente o ComprovaBet anual e, quando solicitados, documentos complementares (como históricos de depósitos, saques e apostas), que podem conter dados de movimentações financeiras.",
             "Registro do compromisso voluntário: aceite, data e hora, endereço IP e identificação do navegador.",
             "Registro do aceite das condições do serviço antes do pagamento da análise: data e hora, versão do texto, endereço IP e identificação do navegador.",

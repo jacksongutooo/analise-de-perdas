@@ -97,6 +97,7 @@ export async function submitCase(params: {
               casinoGames: data.betType === "casino" ? data.casinoGames : [],
               mainLossArea: data.betType === "both" ? data.mainLossArea : null,
               period: data.period,
+              controlLoss: data.controlLoss,
               situations: data.situations,
               situationOther: data.situations.includes("other") ? data.situationOther : null,
               declaredDeposits: centsToDecimal(data.depositsCents),

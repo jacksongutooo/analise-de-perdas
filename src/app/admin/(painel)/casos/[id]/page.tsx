@@ -22,6 +22,7 @@ import {
   BET_TYPE_SUMMARY,
   CASINO_GAMES,
   COMPROVABET_REASON_VALUES,
+  CONTROL_LOSS_SUMMARY,
   DOC_CATEGORIES,
   MAIN_LOSS_AREAS,
   PERIODS,
@@ -29,6 +30,7 @@ import {
   SITUATIONS,
   SPORTS_KINDS,
   labelFor,
+  lostControl,
 } from "@/lib/options";
 import { clientIp, userAgent } from "@/lib/security";
 import {
@@ -374,6 +376,7 @@ export default async function CasePage({
           <div className="flex flex-wrap items-center gap-3">
             <h1 className="text-2xl font-semibold tracking-tight tabular-nums text-ink sm:text-3xl">{c.protocol}</h1>
             <Badge tone={CASE_STATUS_TONE[status]}>{CASE_STATUS_LABEL[status]}</Badge>
+            {lostControl(c.controlLoss) && <Badge tone="warn">{CONTROL_LOSS_SUMMARY[c.controlLoss!]}</Badge>}
             {c.isDemo && <Badge tone="warn">DEMO</Badge>}
           </div>
           <p className="mt-1 text-sm text-muted">
@@ -768,8 +771,11 @@ export default async function CasePage({
             <Info label="Detalhe">{detail || "—"}</Info>
             <Info label="Tempo de uso">{labelFor(PERIODS, c.period)}</Info>
             <Info label="Plataformas">{c.platforms.map((p) => p.platform.name + (p.platform.isCustom ? " (informada)" : "")).join(", ")}</Info>
-            <Info label="Situação">
-              {c.situations.map((s) => labelFor(SITUATIONS, s)).join("; ")}
+            <Info label="Controle das apostas">
+              {c.controlLoss ? CONTROL_LOSS_SUMMARY[c.controlLoss] : <span className="text-muted">Não perguntado (solicitação anterior)</span>}
+            </Info>
+            <Info label="O que aconteceu">
+              {c.situations.map((s) => labelFor(SITUATIONS, s)).join("; ") || "—"}
               {c.situationOther && <span className="block text-ink-soft">“{c.situationOther}”</span>}
             </Info>
             <Info label="Compromisso voluntário">
