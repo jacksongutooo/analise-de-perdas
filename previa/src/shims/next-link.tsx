@@ -28,7 +28,7 @@ export default function Link({ href, replace, scroll, prefetch: _prefetch, onCli
   const handle = (event: MouseEvent<HTMLAnchorElement>) => {
     onClick?.(event);
     if (event.defaultPrevented || !internal) return;
-    if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey || rest.target === "_blank") return;
+    if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
     event.preventDefault();
     void getRouter().navigate(url, { replace, scroll });
   };

@@ -3,12 +3,13 @@ import "./shims/buffer";
 import { seedDemoData } from "@/lib/demo/seed";
 import { installNetworkShims } from "./runtime/api";
 import { start } from "./runtime/render";
-import { installClickHandler } from "./runtime/shell";
+import { installBrowserShims, installClickHandler } from "./runtime/shell";
 import { loadDb } from "./shims/fake-prisma";
 
 async function boot() {
   installNetworkShims();
   installClickHandler();
+  installBrowserShims();
   if (!loadDb()) await seedDemoData();
   start();
 }

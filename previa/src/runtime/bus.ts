@@ -14,7 +14,10 @@ export function channel<T>() {
 
 export type ViewerFile = { name: string; type: string; blob: Blob };
 
+export type ConfirmRequest = { message: string; confirmLabel?: string; onConfirm: () => void };
+
 export const toasts = channel<string>();
+export const confirms = channel<ConfirmRequest>();
 export const viewer = channel<ViewerFile | null>();
 
 export function toast(text: string) {

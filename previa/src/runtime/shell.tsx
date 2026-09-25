@@ -12,7 +12,7 @@ import { CASE_STATUS_LABEL, type CaseStatusValue } from "@/lib/status";
 import { clearStoredFiles } from "../shims/storage-local";
 import { resetDb } from "../shims/fake-prisma";
 import { fetchApiFollow } from "./api";
-import { toast, toasts, viewer, type ViewerFile } from "./bus";
+import { confirms, toast, toasts, viewer, type ConfirmRequest, type ViewerFile } from "./bus";
 import { openWithPdfJs, simplePdfLines } from "./pdf";
 import { clearCookies, cookieStore } from "./request";
 import { getRouter } from "./router-state";
@@ -23,8 +23,9 @@ const OTHER_CPF = "111.444.777-35";
 // ─── Barra da prévia ─────────────────────────────────────────────────────
 function PreviewBar() {
   const link = "rounded px-1 text-white/90 underline-offset-2 hover:text-white hover:underline";
-  const reset = async () => {
-    if (!window.confirm("Apagar tudo o que foi feito na prévia e começar de novo?")) return;
+  const reset = () =>
+    confirms.emit({ message: "Apagar tudo o que foi feito na prévia e começar de novo?", confirmLabel: "Reiniciar", onConfirm: () => void resetNow() });
+  const resetNow = async () => {
     resetDb();
     clearCookies();
     await clearStoredFiles();
@@ -55,7 +56,7 @@ function PreviewBar() {
             Painel da equipe
           </a>
         </nav>
-        <button type="button" className="rounded px-1 text-white/55 hover:text-white" onClick={() => void reset()}>
+        <button type="button" className="rounded px-1 text-white/55 hover:text-white" onClick={reset}>
           Reiniciar prévia
         </button>
       </div>
@@ -137,7 +138,7 @@ function TrackingTip() {
   };
   return (
     <>
-      <div className="fixed bottom-4 right-3 z-40 sm:bottom-8 sm:right-6">
+      <div className="fixed right-3 z-40 sm:right-6" style={{ bottom: "calc(1rem + env(safe-area-inset-bottom, 0px))" }}>
         <button type="button" className={PILL} onClick={() => setOpen(true)}>
           Abrir caso fictício
         </button>
@@ -304,7 +305,7 @@ function ExamplesTip({ pathname }: { pathname: string }) {
     "w-full rounded-xl border border-line px-3 py-2.5 text-left text-[0.86rem] font-medium text-ink transition-colors hover:border-line-strong hover:bg-paper disabled:opacity-50";
   return (
     <>
-      <div className="fixed bottom-28 right-3 z-40 sm:bottom-8 sm:right-6">
+      <div className="fixed right-3 z-40 sm:right-6" style={{ bottom: "calc(7rem + env(safe-area-inset-bottom, 0px))" }}>
         {hasUpload ? (
           <button type="button" className={pill} onClick={() => setOpen(true)}>
             Arquivos de exemplo
@@ -458,9 +459,6 @@ function DocumentViewer() {
       <div className="mx-auto flex w-full max-w-4xl flex-col overflow-hidden rounded-2xl bg-surface shadow-soft">
         <header className="flex items-center gap-3 border-b border-line px-4 py-3">
           <p className="min-w-0 flex-1 truncate text-sm font-semibold text-ink">{file.name}</p>
-          <a href={url} download={file.name} className="rounded-lg px-2 py-1 text-sm font-medium text-navy-700 hover:bg-navy-50">
-            Baixar
-          </a>
           <button type="button" onClick={() => setFile(null)} className="rounded-lg px-2 py-1 text-sm font-medium text-ink-soft hover:bg-paper">
             Fechar
           </button>
@@ -473,7 +471,7 @@ function DocumentViewer() {
           ) : type.startsWith("text/") || type === "application/json" ? (
             <TextPreview blob={file.blob} />
           ) : (
-            <p className="py-10 text-center text-sm text-muted">Visualização indisponível na prévia. Use “Baixar”.</p>
+            <p className="py-10 text-center text-sm text-muted">Visualização indisponível na prévia para este formato.</p>
           )}
         </div>
         <p className="border-t border-line px-4 py-2 text-xs leading-relaxed text-muted">
@@ -521,12 +519,95 @@ export function installClickHandler() {
       }
       if (href.startsWith("/") && !href.startsWith("//")) {
         event.preventDefault();
-        if (anchor.target === "_blank") window.open(`#${href}`, "_blank");
-        else void getRouter().navigate(href);
+        void getRouter().navigate(href);
       }
     },
     true,
   );
+}
+
+/** Confirmação da prévia: substitui window.confirm, que o visualizador de artifacts não exibe. */
+function ConfirmHost() {
+  const [request, setRequest] = useState<ConfirmRequest | null>(null);
+  const confirmButton = useRef<HTMLButtonElement>(null);
+  useEffect(() => confirms.subscribe(setRequest), []);
+  useEffect(() => {
+    if (request) confirmButton.current?.focus();
+  }, [request]);
+  if (!request) return null;
+  const close = () => setRequest(null);
+  return (
+    <div className="fixed inset-0 z-[65] flex items-end justify-center bg-ink/45 p-3 sm:items-center" onClick={(e) => e.target === e.currentTarget && close()}>
+      <div role="alertdialog" aria-label="Confirmação" className="fade-in w-full max-w-sm rounded-2xl bg-surface p-5 shadow-soft">
+        <p className="whitespace-pre-line text-[0.95rem] leading-relaxed text-ink">{request.message}</p>
+        <div className="mt-5 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+          <button type="button" onClick={close} className="min-h-11 rounded-xl border border-line-strong px-4 text-sm font-semibold text-ink hover:bg-paper">
+            Cancelar
+          </button>
+          <button
+            ref={confirmButton}
+            type="button"
+            onClick={() => {
+              close();
+              request.onConfirm();
+            }}
+            className="min-h-11 rounded-xl bg-navy-900 px-4 text-sm font-semibold text-white hover:bg-navy-700"
+          >
+            {request.confirmLabel ?? "Confirmar"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * window.confirm/alert da prévia: a confirmação abre dentro da página e, se aceita, repete o clique
+ * original (desta vez com a resposta "sim"). Formulários GET (filtros) navegam pelo roteador da prévia.
+ */
+export function installBrowserShims() {
+  let lastActivated: HTMLElement | null = null;
+  let bypass = 0;
+  document.addEventListener(
+    "click",
+    (event) => {
+      const el = (event.target as Element | null)?.closest?.("button, a, input[type=submit], [role=button]") as HTMLElement | null;
+      if (el) lastActivated = el;
+    },
+    true,
+  );
+  window.confirm = (message?: string) => {
+    if (bypass > 0) {
+      bypass--;
+      return true;
+    }
+    const target = lastActivated;
+    confirms.emit({
+      message: String(message ?? ""),
+      onConfirm: () => {
+        bypass = 1;
+        target?.click();
+        bypass = 0;
+      },
+    });
+    return false;
+  };
+  window.alert = (message?: unknown) => toast(String(message ?? ""));
+
+  document.addEventListener("submit", (event) => {
+    if (event.defaultPrevented) return;
+    const form = event.target as HTMLFormElement;
+    event.preventDefault();
+    if ((form.getAttribute("method") ?? "get").toLowerCase() !== "get") return toast("Envio indisponível na prévia.");
+    const action = form.getAttribute("action");
+    const path = action && action.startsWith("/") ? action.split("?")[0]! : window.location.hash.slice(1).split(/[?#]/)[0] || "/";
+    const params = new URLSearchParams();
+    for (const [key, value] of new FormData(form, (event as SubmitEvent).submitter ?? undefined)) {
+      if (typeof value === "string") params.append(key, value);
+    }
+    const query = params.toString();
+    void getRouter().navigate(`${path}${query ? `?${query}` : ""}`);
+  });
 }
 
 // ─── Erros ───────────────────────────────────────────────────────────────
@@ -573,6 +654,7 @@ export function PreviewShell({ pathname, children }: { pathname: string; childre
       <TipFor pathname={pathname} />
       <Toasts />
       <DocumentViewer />
+      <ConfirmHost />
     </>
   );
 }

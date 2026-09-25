@@ -242,3 +242,20 @@ html, body { margin: 0; background: #f3f5f8; }
 await mkdir(previaDir, { recursive: true });
 await writeFile(path.join(previaDir, "index.html"), html);
 console.log(`previa/index.html gerado (${(html.length / 1024).toFixed(0)} KB)`);
+
+// --fragmento <arquivo>: mesma página sem <html>/<head>/<body>, para publicar onde o esqueleto HTML
+// é adicionado automaticamente (ex.: Artifacts do Claude).
+const flag = process.argv.indexOf("--fragmento");
+if (flag > 0 && process.argv[flag + 1]) {
+  const fragment = html
+    .replace(/^<!doctype html>\s*/i, "")
+    .replace(/<html[^>]*>\s*/i, "")
+    .replace(/<\/?head>\s*/gi, "")
+    .replace(/<meta charset="utf-8" \/>\s*/i, "")
+    .replace(/<meta name="viewport"[^>]*>\s*/i, "")
+    .replace(/<\/?body>\s*/gi, "")
+    .replace(/<\/html>\s*$/i, "");
+  const target = path.resolve(process.argv[flag + 1]);
+  await writeFile(target, fragment);
+  console.log(`fragmento gerado em ${target}`);
+}
