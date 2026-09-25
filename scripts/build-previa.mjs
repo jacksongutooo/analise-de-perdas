@@ -189,7 +189,7 @@ const result = await build({
   minify: true,
   jsx: "automatic",
   legalComments: "none",
-  charset: "utf8",
+  charset: "ascii", // caracteres especiais como escapes (ex.: \uFFFD da leitura de CSV)
   define: { "process.env.NODE_ENV": '"production"' },
   loader: { ".css": "empty", ".png": "empty", ".svg": "empty" },
   external: ["unpdf", "xlsx"],
