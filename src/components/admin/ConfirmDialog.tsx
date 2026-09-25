@@ -62,6 +62,7 @@ export function ConfirmDialog({
   children?: ReactNode;
 }) {
   const dialog = useRef<HTMLDialogElement>(null);
+  const cancel = useRef<HTMLButtonElement>(null);
   return (
     <>
       <Button
@@ -71,7 +72,11 @@ export function ConfirmDialog({
         className={className}
         disabled={disabled}
         title={disabled ? disabledReason : undefined}
-        onClick={() => dialog.current?.showModal()}
+        onClick={() => {
+          dialog.current?.showModal();
+          // Foco inicial em "Cancelar": evita abrir o teclado no celular e confirmações acidentais com Enter.
+          cancel.current?.focus();
+        }}
       >
         {icon}
         {label}
@@ -90,7 +95,7 @@ export function ConfirmDialog({
           {hidden && Object.entries(hidden).map(([name, value]) => <input key={name} type="hidden" name={name} value={value} />)}
           {children && <div className="mt-4 space-y-3">{children}</div>}
           <div className="mt-6 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
-            <Button type="button" variant="secondary" onClick={() => dialog.current?.close()}>
+            <Button ref={cancel} type="button" variant="secondary" onClick={() => dialog.current?.close()}>
               Cancelar
             </Button>
             <ConfirmButton variant={confirmVariant}>{confirmLabel}</ConfirmButton>

@@ -4,6 +4,7 @@ import type {
   ButtonHTMLAttributes,
   InputHTMLAttributes,
   ReactNode,
+  Ref,
   SelectHTMLAttributes,
   TextareaHTMLAttributes,
 } from "react";
@@ -34,7 +35,7 @@ export function buttonClasses(variant: Variant = "primary", size: Size = "md", c
   );
 }
 
-type ButtonProps = ButtonHTMLAttributes<HTMLButtonElement> & { variant?: Variant; size?: Size; loading?: boolean };
+type ButtonProps = ButtonHTMLAttributes<HTMLButtonElement> & { variant?: Variant; size?: Size; loading?: boolean; ref?: Ref<HTMLButtonElement> };
 
 export function Button({ variant, size, loading, className, children, disabled, type = "button", ...rest }: ButtonProps) {
   return (

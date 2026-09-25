@@ -51,7 +51,9 @@ function StageBlock({ data }: { data: ClientCase }) {
         </Card>
       );
     case "additional_documents": {
-      const cpfProblem = data.document?.status === "cpf_mismatch" || data.openRequest?.reasons.includes("cpf_mismatch");
+      const cpfProblem =
+        (data.document?.status === "cpf_mismatch" || data.openRequest?.reasons.includes("cpf_mismatch")) &&
+        !data.openRequest?.message?.includes(CPF_MISMATCH_MESSAGE);
       return (
         <section className="rounded-2xl border border-warn-700/25 bg-warn-50 p-5">
           <div className="flex items-start gap-3">

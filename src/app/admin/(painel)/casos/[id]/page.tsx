@@ -431,6 +431,11 @@ export default async function CasePage({
                 <a href={`/api/admin/documents/${primary.id}/view`} target="_blank" rel="noopener noreferrer" className="text-xs font-medium text-navy-700 hover:underline">
                   Visualizar
                 </a>
+                {comprovabetDocs.length > 1 && (
+                  <a href="#documentos" className="text-xs text-muted hover:underline">
+                    + {plural(comprovabetDocs.length - 1, "outro arquivo", "outros arquivos")}
+                  </a>
+                )}
               </span>
             ) : (
               <span className="text-muted">Nenhum ComprovaBet · {plural(c.documents.length, "documento", "documentos")} no caso</span>

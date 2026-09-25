@@ -33,7 +33,7 @@ export default async function PagamentoPage({ searchParams }: { searchParams: Pr
       </Link>
 
       <h1 className="mt-5 text-[1.9rem] font-semibold leading-tight tracking-tight text-ink">Pagamento da análise</h1>
-      <p className="mt-2 text-ink-soft">Seu ComprovaBet foi validado. O próximo passo é o pagamento do serviço de análise.</p>
+      <p className="mt-2 text-ink-soft">Seu ComprovaBet foi analisado pela nossa equipe. O próximo passo é o pagamento do serviço de análise.</p>
 
       {config.analysisPriceCents !== null && (
         <div className="mt-6 flex items-baseline justify-between gap-4 rounded-2xl border border-line bg-surface px-5 py-4 shadow-soft">
