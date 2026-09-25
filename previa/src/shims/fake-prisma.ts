@@ -133,6 +133,8 @@ function normalize(field: Field, value: any): any {
     case "Boolean":
       return Boolean(value);
     case "Json":
+      // Prisma.DbNull / JsonNull (marcadores do shim de @prisma/client) viram null.
+      if (typeof value === "object" && "__previaNull" in value) return null;
       return structuredClone(value);
     default:
       return value;

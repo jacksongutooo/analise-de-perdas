@@ -12,7 +12,13 @@ export class PrismaClientKnownRequestError extends Error {
   }
 }
 
-export const Prisma = { PrismaClientKnownRequestError };
+/** Marcadores de nulo dos campos JSON (Prisma.DbNull etc.): o banco simulado grava null. */
+const nullMarker = (name: string) => Object.freeze({ __previaNull: name });
+export const DbNull = nullMarker("DbNull");
+export const JsonNull = nullMarker("JsonNull");
+export const AnyNull = nullMarker("AnyNull");
+
+export const Prisma = { PrismaClientKnownRequestError, DbNull, JsonNull, AnyNull };
 
 export class PrismaClient {
   constructor() {

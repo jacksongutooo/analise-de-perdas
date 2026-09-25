@@ -2,9 +2,11 @@
 
 import Link from "next/link";
 import type { ReactNode, RefObject } from "react";
+import { PAYMENT_NOTICE, SERVICE_TERMS_CHECKBOX } from "@/lib/comprovabet";
 import { cpfDigits, maskCpfInput } from "@/lib/cpf";
 import { cx } from "@/lib/cx";
-import { formatBRL, maskPhoneInput, plural } from "@/lib/format";
+import { formatBRL, formatDateTime, maskPhoneInput, plural } from "@/lib/format";
+import { paymentMethodLabel } from "@/lib/payments/types";
 import {
   BET_TYPES,
   BET_TYPE_SUMMARY,
@@ -25,10 +27,10 @@ import {
   type ControlLossValue,
 } from "@/lib/options";
 import { MoneyInput } from "../MoneyInput";
-import { IconCheck, IconDice, IconLayers, IconPlus, IconTrophy, IconX } from "../icons";
-import { Field, LedgerRow, Notice, TextInput } from "../ui";
+import { IconAlert, IconCheck, IconDice, IconLayers, IconLock, IconPlus, IconTrophy, IconX } from "../icons";
+import { Button, Field, LedgerRow, Notice, TextInput } from "../ui";
 import { ChoiceCard } from "./ChoiceCard";
-import { contactErrors, currentSituations, declaredLoss, type Screen, type WizardData } from "./state";
+import { contactErrors, currentSituations, declaredLoss, type PaymentState, type Screen, type WizardData } from "./state";
 
 type HeadingRef = RefObject<HTMLHeadingElement | null>;
 type Update = (patch: Partial<WizardData>) => void;
@@ -582,8 +584,166 @@ export function ReviewStep({
         </ReviewRow>
       </dl>
       <p className="mt-4 text-sm leading-relaxed text-muted">
-        Cada caso é analisado individualmente. A análise não garante recuperação, restituição ou recebimento de valores. Ao enviar, você
-        concorda com os{" "}
+        Cada caso é analisado individualmente. A análise não garante recuperação, restituição ou recebimento de valores. Na próxima
+        tela, você confere o valor e faz o pagamento da análise; a solicitação é enviada depois da confirmação do pagamento.
+      </p>
+    </>
+  );
+}
+
+// ─── Pagamento da análise (antes da solicitação) ──────────────────────────
+export type PaymentSettings = {
+  /** Gateway e valor configurados. */
+  available: boolean;
+  priceCents: number | null;
+  /** Formas de pagamento e quem processa (ou o aviso da demonstração), abaixo do valor. */
+  note: string;
+};
+
+/** Situação do pagamento: fica no topo da tela para ser vista logo na volta do checkout. */
+function PaymentStatus({
+  payment,
+  available,
+  checking,
+  onCheck,
+}: {
+  payment: PaymentState | null;
+  available: boolean;
+  checking: boolean;
+  onCheck: () => void;
+}) {
+  const status = payment?.status ?? "none";
+  if (status === "approved") {
+    return (
+      <Notice tone="ok">
+        <span className="flex items-start gap-2">
+          <IconCheck size={18} strokeWidth={2.5} className="mt-0.5 shrink-0" />
+          <span>
+            <strong className="font-semibold">Pagamento confirmado</strong>
+            {payment?.paidAt ? ` em ${formatDateTime(payment.paidAt)}` : ""}
+            {payment?.method ? ` · ${paymentMethodLabel(payment.method)}` : ""}.
+            <span className="mt-0.5 block text-ink-soft">
+              {payment?.protocol
+                ? `Sua solicitação já está registrada com o protocolo ${payment.protocol}. Toque em Solicitar análise para concluir.`
+                : "Toque em Solicitar análise para concluir."}
+            </span>
+          </span>
+        </span>
+      </Notice>
+    );
+  }
+  if (!available) {
+    return (
+      <Notice tone="warn">
+        O pagamento está indisponível no momento. Suas respostas ficam salvas neste aparelho: volte mais tarde para concluir.
+      </Notice>
+    );
+  }
+  if (status === "pending") {
+    return (
+      <Notice tone="info">
+        <p>
+          <strong className="font-semibold">Aguardando a confirmação do pagamento.</strong> Se você já pagou, a confirmação pode levar alguns
+          instantes. Se ainda não concluiu, toque em Retomar pagamento.
+        </p>
+        <Button variant="secondary" size="sm" className="mt-3" onClick={onCheck} loading={checking}>
+          Verificar pagamento
+        </Button>
+      </Notice>
+    );
+  }
+  if (status === "rejected") return <Notice tone="danger">O pagamento não foi aprovado. Você pode tentar de novo com Pix ou com outro cartão.</Notice>;
+  if (status === "refunded") return <Notice tone="warn">O pagamento anterior foi estornado. Para solicitar a análise, faça um novo pagamento.</Notice>;
+  if (status === "cancelled") return <Notice tone="warn">O pagamento anterior não foi concluído. Você pode tentar novamente.</Notice>;
+  return null;
+}
+
+export function PaymentStep({
+  data,
+  update,
+  headingRef,
+  settings,
+  payment,
+  checking,
+  showErrors,
+  onCheck,
+}: {
+  data: WizardData;
+  update: Update;
+  headingRef: HeadingRef;
+  settings: PaymentSettings;
+  payment: PaymentState | null;
+  checking: boolean;
+  showErrors: boolean;
+  onCheck: () => void;
+}) {
+  const paid = payment?.status === "approved";
+  const accepted = paid || data.termsAccepted;
+  const missingAccept = showErrors && !accepted;
+  return (
+    <>
+      <StepHeading
+        headingRef={headingRef}
+        id="q-payment"
+        title="Pagamento da análise"
+        subtitle={
+          paid
+            ? "Pagamento confirmado. Agora é só solicitar a análise."
+            : "Confira o valor, leia o aviso e marque o aceite. Depois da confirmação do pagamento, o botão Solicitar análise é liberado."
+        }
+      />
+
+      <div className="mb-5 empty:mb-0" aria-live="polite">
+        <PaymentStatus payment={payment} available={settings.available} checking={checking} onCheck={onCheck} />
+      </div>
+
+      <div className="rounded-2xl border border-line bg-surface px-5 py-4 shadow-soft">
+        <div className="flex items-baseline justify-between gap-4">
+          <span className="text-sm text-ink-soft">Valor da análise</span>
+          <span className="text-2xl font-semibold tabular-nums text-ink">
+            {settings.priceCents !== null ? formatBRL(settings.priceCents) : "—"}
+          </span>
+        </div>
+        <p className="mt-2 flex items-start gap-1.5 text-xs leading-relaxed text-muted">
+          <IconLock size={14} className="mt-px shrink-0" />
+          <span>{settings.note}</span>
+        </p>
+      </div>
+
+      <section className="mt-4 rounded-2xl border border-warn-700/25 bg-warn-50 p-5" aria-labelledby="payment-notice-title">
+        <p id="payment-notice-title" className="flex items-center gap-2 text-base font-semibold text-warn-700">
+          <IconAlert size={19} /> Importante
+        </p>
+        <p className="mt-2 text-[0.95rem] leading-relaxed text-ink">{PAYMENT_NOTICE}</p>
+      </section>
+
+      <label
+        className={cx(
+          "mt-4 flex items-start gap-3 rounded-2xl border p-4 transition-colors",
+          paid
+            ? "border-line bg-surface"
+            : accepted
+              ? "cursor-pointer border-navy-900 bg-navy-50 shadow-[inset_0_0_0_1px_var(--color-navy-900)]"
+              : missingAccept
+                ? "cursor-pointer border-danger-700/40 bg-danger-50"
+                : "cursor-pointer border-line-strong bg-surface",
+        )}
+      >
+        <input
+          type="checkbox"
+          checked={accepted}
+          disabled={paid}
+          onChange={(e) => update({ termsAccepted: e.target.checked })}
+          aria-invalid={missingAccept || undefined}
+          className="mt-0.5 size-5 shrink-0 accent-navy-900"
+        />
+        <span className="text-[0.95rem] leading-relaxed text-ink">{SERVICE_TERMS_CHECKBOX}</span>
+      </label>
+      <p className="mt-2 text-xs leading-relaxed text-muted">
+        {payment?.termsAcceptedAt
+          ? `Aceite registrado em ${formatDateTime(payment.termsAcceptedAt)}. `
+          : "O aceite fica registrado com data e hora ao abrir o pagamento. "}
+        Leia as condições completas nos{" "}
         <Link href="/termos" target="_blank" className="font-medium text-navy-700 underline underline-offset-2">
           Termos de Uso
         </Link>

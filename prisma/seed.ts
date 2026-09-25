@@ -12,6 +12,7 @@ async function wipeDemoData() {
   for (const d of docs) await storage.remove(d.storageKey).catch(() => undefined);
   await prisma.case.deleteMany({ where: { isDemo: true } });
   await prisma.caseDraft.deleteMany({ where: { isDemo: true } });
+  await prisma.payment.deleteMany({ where: { isDemo: true } });
   await prisma.document.deleteMany({ where: { isDemo: true } });
   await prisma.user.deleteMany({ where: { isDemo: true } });
   await prisma.adminSession.deleteMany({ where: { admin: { isDemo: true } } });

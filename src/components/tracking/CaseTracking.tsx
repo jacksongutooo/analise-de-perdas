@@ -48,6 +48,12 @@ function StageBlock({ data }: { data: ClientCase }) {
       return (
         <Card tone="info" title="Validação documental">
           <p>{data.hasComprovaBet ? VALIDATION_PENDING_TEXT : "Seus documentos foram recebidos e estão aguardando a conferência da nossa equipe."}</p>
+          {data.paymentStatus === "confirmed" && data.paymentConfirmedAt && (
+            <p className="flex items-center gap-1.5 text-sm text-ok-700">
+              <IconCheck size={16} strokeWidth={2.5} className="shrink-0" />
+              Pagamento da análise confirmado em {formatDate(data.paymentConfirmedAt)}.
+            </p>
+          )}
         </Card>
       );
     case "additional_documents": {
@@ -110,8 +116,9 @@ function StageBlock({ data }: { data: ClientCase }) {
       );
     case "payment_confirmed":
       return (
-        <Card tone="ok" title="Pagamento confirmado">
-          <p>Sua análise será iniciada pela nossa equipe. Você acompanha todas as etapas por este painel.</p>
+        <Card tone="ok" title={data.hasComprovaBet ? DOCUMENT_APPROVED_TITLE : "Documentação validada"}>
+          {data.hasComprovaBet && <p>{DOCUMENT_APPROVED_TEXT}</p>}
+          <p>A análise será iniciada pela nossa equipe. Você acompanha todas as etapas por este painel.</p>
         </Card>
       );
     case "under_review":

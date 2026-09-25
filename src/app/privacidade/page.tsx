@@ -26,6 +26,7 @@ export default function PrivacidadePage() {
             "Documentos enviados por você, principalmente o ComprovaBet anual e, quando solicitados, documentos complementares (como históricos de depósitos, saques e apostas), que podem conter dados de movimentações financeiras.",
             "Registro do compromisso voluntário: aceite, data e hora, endereço IP e identificação do navegador.",
             "Registro do aceite das condições do serviço antes do pagamento da análise: data e hora, versão do texto, endereço IP e identificação do navegador.",
+            "Dados do pagamento da análise informados pelo provedor de pagamento: situação, forma de pagamento (Pix ou cartão), valor, data e identificador da transação. Os dados do cartão são digitados na página do provedor e não passam pelo site.",
             "Dados técnicos de acesso: endereço IP, data e hora e identificação do navegador, inclusive nos acessos ao acompanhamento.",
           ]}
         />
@@ -37,7 +38,7 @@ export default function PrivacidadePage() {
           items={[
             "Analisar a documentação enviada e classificar o seu caso.",
             "Conferir se o ComprovaBet pertence a você, comparando o CPF do documento com o CPF informado.",
-            "Registrar o aceite das condições e acompanhar o pagamento da análise.",
+            "Registrar o aceite das condições e confirmar o pagamento da análise com o provedor de pagamento.",
             "Conferir os valores informados com os documentos.",
             "Informar o andamento e o resultado da análise pelo painel de acompanhamento, e-mail ou WhatsApp.",
             "Solicitar documentos adicionais, quando necessários.",
@@ -61,6 +62,11 @@ export default function PrivacidadePage() {
           hospedagem, banco de dados e armazenamento de arquivos, sob obrigações de confidencialidade e segurança. Também poderemos compartilhar dados
           quando exigido por lei ou por ordem de autoridade competente.
         </p>
+        <p>
+          O pagamento da análise é processado pelo Mercado Pago, que recebe o seu nome, o seu e-mail e o valor para identificar o pagamento e
+          trata os dados de pagamento conforme a política de privacidade própria. Os documentos e as respostas do formulário não são enviados ao
+          provedor de pagamento.
+        </p>
       </LegalSection>
 
       <LegalSection title="5. Armazenamento e segurança">
@@ -79,7 +85,7 @@ export default function PrivacidadePage() {
       <LegalSection title="6. Por quanto tempo guardamos">
         <LegalList
           items={[
-            `Arquivos enviados em solicitações não concluídas são apagados automaticamente em até ${config.draftTtlDays} dias.`,
+            `Arquivos enviados em solicitações não concluídas são apagados automaticamente em até ${config.draftTtlDays} dias (ou em até 30 dias, quando o pagamento chegou a ser iniciado).`,
             "Os dados das solicitações enviadas são mantidos durante a análise e pelo período necessário para as finalidades descritas, para o exercício regular de direitos e para o cumprimento de obrigações legais.",
             "Registros de acesso são mantidos por no mínimo 6 meses, conforme o Marco Civil da Internet (Lei nº 12.965/2014).",
           ]}

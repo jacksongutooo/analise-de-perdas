@@ -3,14 +3,24 @@ import { SiteFooter, SiteHeader } from "@/components/site";
 import { LinkButton } from "@/components/ui";
 import { TRUST_LINE } from "@/lib/comprovabet";
 import { config } from "@/lib/env";
+import { formatBRL } from "@/lib/format";
 import { NO_PASSWORD_NOTICE } from "@/lib/options";
+import { analysisPrice } from "@/lib/payments";
 
 export default function HomePage() {
   const year = config.comprovabetYear;
+  const price = analysisPrice();
   const checklist = [
     { title: "Seu CPF", hint: "O mesmo CPF que aparece no documento" },
     { title: `ComprovaBet ${year}`, hint: "Documento anual em seu nome, de preferência em PDF" },
     { title: "E-mail e WhatsApp", hint: "Para acompanhar o caso e receber orientações" },
+    {
+      title: "Pix ou cartão de crédito",
+      hint:
+        price && !price.example
+          ? `A análise custa ${formatBRL(price.cents)} e é paga no fim do formulário, antes da solicitação`
+          : "A análise é paga no fim do formulário, antes da solicitação",
+    },
   ];
   return (
     <div className="flex min-h-dvh flex-col">

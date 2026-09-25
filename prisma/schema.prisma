@@ -225,6 +225,7 @@ model Case {
   requests           DocumentRequest[]
   draft              CaseDraft?
   agreements         ServiceAgreement[]
+  payments           Payment[]
 
   @@index([status])
   @@index([createdAt])
@@ -264,21 +265,74 @@ model FinancialDeclaration {
 }
 
 model CaseDraft {
-  id          String    @id @default(cuid())
-  tokenHash   String    @map("token_hash")
+  id              String    @id @default(cuid())
+  tokenHash       String    @map("token_hash")
   /// CPF informado no formulário, usado na conferência do ComprovaBet. Apagado no envio final.
-  cpf         String?
-  isDemo      Boolean   @default(false) @map("is_demo")
-  createdAt   DateTime  @default(now()) @map("created_at")
-  expiresAt   DateTime  @map("expires_at")
-  submittedAt DateTime? @map("submitted_at")
-  caseId      String?   @unique @map("case_id")
+  cpf             String?
+  isDemo          Boolean   @default(false) @map("is_demo")
+  createdAt       DateTime  @default(now()) @map("created_at")
+  expiresAt       DateTime  @map("expires_at")
+  submittedAt     DateTime? @map("submitted_at")
+  caseId          String?   @unique @map("case_id")
+  /// Respostas do formulário gravadas ao iniciar o pagamento: com o pagamento aprovado, a solicitação
+  /// é concluída mesmo que o cliente não volte ao site. Apagadas no envio final.
+  answers         Json?
+  /// Aceite das condições do serviço, feito na tela de pagamento (copiado para o caso no envio).
+  termsAcceptedAt DateTime? @map("terms_accepted_at")
+  termsVersion    String?   @map("terms_version")
+  termsIp         String?   @map("terms_ip")
+  termsUserAgent  String?   @map("terms_user_agent")
 
   case      Case?      @relation(fields: [caseId], references: [id], onDelete: SetNull)
   documents Document[]
+  payments  Payment[]
 
   @@index([expiresAt])
   @@map("case_drafts")
+}
+
+enum PaymentProvider {
+  mercadopago
+  demo
+
+  @@map("payment_provider")
+}
+
+enum PaymentAttemptStatus {
+  pending
+  approved
+  rejected
+  cancelled
+  refunded
+
+  @@map("payment_attempt_status")
+}
+
+/// Pagamento da análise pelo gateway, feito antes do envio da solicitação. Cada tentativa é um registro.
+model Payment {
+  id                String               @id @default(cuid())
+  draftId           String?              @map("draft_id")
+  caseId            String?              @map("case_id")
+  provider          PaymentProvider
+  status            PaymentAttemptStatus @default(pending)
+  statusDetail      String?              @map("status_detail")
+  amount            Decimal              @db.Decimal(14, 2)
+  /// Meio de pagamento informado pelo gateway (pix, credit_card, debit_card...).
+  method            String?
+  checkoutId        String?              @map("checkout_id")
+  checkoutUrl       String?              @map("checkout_url")
+  providerPaymentId String?              @map("provider_payment_id")
+  paidAt            DateTime?            @map("paid_at")
+  isDemo            Boolean              @default(false) @map("is_demo")
+  createdAt         DateTime             @default(now()) @map("created_at")
+  updatedAt         DateTime             @updatedAt @map("updated_at")
+
+  draft CaseDraft? @relation(fields: [draftId], references: [id], onDelete: SetNull)
+  case  Case?      @relation(fields: [caseId], references: [id], onDelete: SetNull)
+
+  @@index([draftId])
+  @@index([caseId])
+  @@map("payments")
 }
 
 model Document {

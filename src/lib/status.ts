@@ -3,7 +3,8 @@
 export type Tone = "neutral" | "info" | "progress" | "warn" | "ok" | "danger";
 
 // ─── Caso ─────────────────────────────────────────────────────────────────
-// Fluxo: cadastro → ComprovaBet enviado → validação documental → pagamento → análise → conclusão.
+// Fluxo atual: cadastro e ComprovaBet → pagamento da análise → solicitação → validação documental → análise → conclusão.
+// Casos anteriores: validação documental → pagamento ("Aguardando pagamento") → análise.
 export const CASE_STATUS_VALUES = [
   "submitted",
   "documents_received",
@@ -22,7 +23,8 @@ export const CASE_STATUS_LABEL: Record<CaseStatusValue, string> = {
   documents_received: "Validação documental",
   additional_documents: "Documentação complementar necessária",
   awaiting_payment: "Aguardando pagamento",
-  payment_confirmed: "Pagamento confirmado",
+  // Documento validado e análise paga: falta a equipe iniciar a análise.
+  payment_confirmed: "Aguardando início da análise",
   under_review: "Análise em andamento",
   eligible: "Caso com possibilidade de prosseguimento",
   not_eligible: "Elementos insuficientes para prosseguir",
@@ -57,8 +59,9 @@ export const ADMIN_SETTABLE_STATUSES: CaseStatusValue[] = [
 
 export const STATUS_GROUPS = {
   new: ["submitted", "documents_received"],
-  waiting: ["additional_documents"],
-  payment: ["awaiting_payment", "payment_confirmed"],
+  /** Depende do cliente: documentação complementar (ou pagamento, nos casos anteriores ao pagamento antecipado). */
+  waiting: ["additional_documents", "awaiting_payment"],
+  ready: ["payment_confirmed"],
   review: ["under_review"],
   done: ["eligible", "not_eligible", "completed"],
 } as const satisfies Record<string, readonly CaseStatusValue[]>;
@@ -193,6 +196,23 @@ export const PAYMENT_STATUS_TONE: Record<PaymentStatusValue, Tone> = {
   confirmed: "ok",
 };
 
+/** Cada tentativa de pagamento no gateway (tabela payments). */
+export const PAYMENT_ATTEMPT_LABEL: Record<"pending" | "approved" | "rejected" | "cancelled" | "refunded", string> = {
+  pending: "Aguardando pagamento",
+  approved: "Aprovado",
+  rejected: "Recusado",
+  cancelled: "Não concluído",
+  refunded: "Estornado",
+};
+
+export const PAYMENT_ATTEMPT_TONE: Record<keyof typeof PAYMENT_ATTEMPT_LABEL, Tone> = {
+  pending: "warn",
+  approved: "ok",
+  rejected: "danger",
+  cancelled: "neutral",
+  refunded: "neutral",
+};
+
 // ─── Linha do tempo do cliente ───────────────────────────────────────────
 export type TimelineState = "done" | "current" | "attention" | "pending";
 export type TimelineStep = { key: string; label: string; state: TimelineState; date: Date | null; note?: string };
@@ -205,11 +225,17 @@ export function complementDuringAnalysis(history: History): boolean {
   return last?.fromStatus === "under_review" || last?.fromStatus === "payment_confirmed";
 }
 
+/** A análise foi paga antes da solicitação (fluxo atual)? Tolerância para a diferença de relógio entre servidores. */
+export function paidBeforeRequest(paymentConfirmedAt: Date | null, createdAt: Date): boolean {
+  return paymentConfirmedAt !== null && paymentConfirmedAt.getTime() <= createdAt.getTime() + 5 * 60_000;
+}
+
 /**
- * Etapas exibidas ao solicitante:
- * 1. Cadastro realizado · 2. ComprovaBet enviado · 3. Validação documental ·
- * 4. Pagamento confirmado · 5. Análise em andamento · 6. Análise concluída.
- * Casos anteriores ao pagamento da análise (pagamento "não se aplica") não exibem a etapa 4.
+ * Etapas exibidas ao solicitante. No fluxo atual (pagamento antes da solicitação):
+ * 1. Cadastro realizado · 2. ComprovaBet enviado · 3. Pagamento confirmado ·
+ * 4. Validação documental · 5. Análise em andamento · 6. Análise concluída.
+ * Casos em que o pagamento veio depois da validação mostram o pagamento como 4ª etapa;
+ * casos anteriores ao pagamento da análise (pagamento "não se aplica") não exibem essa etapa.
  */
 export function clientTimeline(input: {
   status: CaseStatusValue;
@@ -232,8 +258,10 @@ export function clientTimeline(input: {
   const finished = FINISHED_STATUSES.includes(status);
   const legacy = paymentStatus === "not_applicable";
   const paid = paymentStatus === "confirmed";
+  const payFirst = paid && paidBeforeRequest(input.paymentConfirmedAt, input.createdAt);
   const analysisReached = finished || status === "under_review" || at(["under_review"]) !== null;
-  const complementInAnalysis = status === "additional_documents" && (legacy ? analysisReached : paid);
+  // Complemento pedido durante a análise (e não na validação do documento).
+  const complementInAnalysis = status === "additional_documents" && (legacy || payFirst ? analysisReached : paid);
   const validated =
     input.documentApprovedAt !== null ||
     finished ||
@@ -242,6 +270,25 @@ export function clientTimeline(input: {
     status === "under_review" ||
     complementInAnalysis;
 
+  const validation: TimelineStep = {
+    key: "validation",
+    label: "Validação documental",
+    state: validated ? "done" : status === "additional_documents" ? "attention" : "current",
+    date: validated ? (input.documentApprovedAt ?? at(payFirst ? ["payment_confirmed", "under_review"] : ["awaiting_payment", "under_review"])) : null,
+    note: !validated && status === "additional_documents" ? "Documentação complementar necessária" : undefined,
+  };
+  const payment: TimelineStep = {
+    key: "payment",
+    label: "Pagamento confirmado",
+    state: paid ? "done" : status === "awaiting_payment" ? "current" : "pending",
+    date: paid ? input.paymentConfirmedAt : null,
+    note:
+      !paid && status === "awaiting_payment"
+        ? paymentStatus === "awaiting_confirmation"
+          ? "Pagamento em confirmação"
+          : "Aguardando pagamento"
+        : undefined,
+  };
   const steps: TimelineStep[] = [
     { key: "registered", label: "Cadastro realizado", state: "done", date: input.createdAt },
     {
@@ -250,28 +297,10 @@ export function clientTimeline(input: {
       state: input.documentSentAt || status !== "submitted" ? "done" : "current",
       date: input.documentSentAt ?? at(["documents_received"]),
     },
-    {
-      key: "validation",
-      label: "Validação documental",
-      state: validated ? "done" : status === "additional_documents" ? "attention" : "current",
-      date: validated ? (input.documentApprovedAt ?? at(["awaiting_payment", "under_review"])) : null,
-      note: !validated && status === "additional_documents" ? "Documentação complementar necessária" : undefined,
-    },
   ];
-  if (!legacy) {
-    steps.push({
-      key: "payment",
-      label: "Pagamento confirmado",
-      state: paid ? "done" : status === "awaiting_payment" ? "current" : "pending",
-      date: paid ? input.paymentConfirmedAt : null,
-      note:
-        !paid && status === "awaiting_payment"
-          ? paymentStatus === "awaiting_confirmation"
-            ? "Pagamento em confirmação"
-            : "Aguardando pagamento"
-          : undefined,
-    });
-  }
+  if (legacy) steps.push(validation);
+  else if (payFirst) steps.push(payment, validation);
+  else steps.push(validation, payment);
   steps.push(
     {
       key: "analysis",

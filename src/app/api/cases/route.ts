@@ -7,13 +7,17 @@ import { SubmissionError, submitCase } from "@/lib/cases/submit";
 import { safeErrorMessage } from "@/lib/cpf";
 import { prisma } from "@/lib/db";
 import { processCaseDocuments } from "@/lib/extraction/process";
+import { syncDraftPayments } from "@/lib/payments";
 import { clientIp, userAgent } from "@/lib/security";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
-/** Envio final da solicitação. Idempotente: reenviar o mesmo rascunho devolve o mesmo protocolo. */
+/**
+ * Envio final da solicitação, depois do pagamento aprovado. Idempotente: reenviar o mesmo rascunho (ou chegar
+ * depois de a confirmação do pagamento já ter concluído a solicitação) devolve o mesmo protocolo.
+ */
 export async function POST(req: Request) {
   const ip = clientIp(req.headers);
   const ua = userAgent(req.headers);
@@ -48,7 +52,17 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: issue?.message ?? "Dados inválidos.", field: issue?.path.join(".") }, { status: 422 });
   }
 
+  const existingProtocol = async () => {
+    const current = await prisma.caseDraft.findUnique({ where: { id: draft.id }, select: { caseId: true } });
+    const c = current?.caseId ? await prisma.case.findUnique({ where: { id: current.caseId }, select: { id: true, protocol: true } }) : null;
+    if (!c) return null;
+    await setTrackingSession(c.id);
+    return NextResponse.json({ protocol: c.protocol });
+  };
+
   try {
+    // A confirmação do pagamento pode ainda não ter chegado: consulta o gateway antes de enviar.
+    await syncDraftPayments(draft.id, { finalize: false });
     const result = await submitCase({ draftId: draft.id, isDemo: draft.isDemo, data: parsed.data, ip, userAgent: ua });
     await logAccess({ action: "case.submit", ip, userAgent: ua, targetType: "case", targetId: result.caseId });
     await setTrackingSession(result.caseId);
@@ -59,6 +73,10 @@ export async function POST(req: Request) {
     return NextResponse.json({ protocol: result.protocol }, { status: 201 });
   } catch (error) {
     if (error instanceof SubmissionError) {
+      if (error.field === "draft") {
+        const existing = await existingProtocol();
+        if (existing) return existing;
+      }
       return NextResponse.json({ error: error.message, field: error.field }, { status: error.field === "draft" ? 409 : 422 });
     }
     console.error("[cases] falha ao registrar solicitação", safeErrorMessage(error));

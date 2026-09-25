@@ -1,7 +1,9 @@
 import Link from "next/link";
-import { Badge } from "@/components/ui";
+import { Badge, Notice } from "@/components/ui";
 import { requireAdmin } from "@/lib/auth/admin";
 import { getDashboard } from "@/lib/cases/admin-queries";
+import { config } from "@/lib/env";
+import { paymentAvailable } from "@/lib/payments";
 import { formatBRL, formatDate } from "@/lib/format";
 import { BET_TYPE_SHORT } from "@/lib/options";
 import { CASE_STATUS_LABEL, CASE_STATUS_TONE } from "@/lib/status";
@@ -11,8 +13,8 @@ export default async function DashboardPage() {
   const d = await getDashboard();
   const kpis = [
     { label: "Validação documental", value: d.groups.new, href: "/admin/casos?status=group:new" },
-    { label: "Aguardando documentos", value: d.groups.waiting, href: "/admin/casos?status=group:waiting" },
-    { label: "Pagamento", value: d.groups.payment, href: "/admin/casos?status=group:payment" },
+    { label: "Aguardando o cliente", value: d.groups.waiting, href: "/admin/casos?status=group:waiting" },
+    { label: "Prontos para análise", value: d.groups.ready, href: "/admin/casos?status=group:ready" },
     { label: "Em análise", value: d.groups.review, href: "/admin/casos?status=group:review" },
     { label: "Concluídas", value: d.groups.done, href: "/admin/casos?status=group:done" },
   ];
@@ -29,6 +31,14 @@ export default async function DashboardPage() {
           Ver todos os casos
         </Link>
       </div>
+
+      {!paymentAvailable() && (
+        <Notice tone="warn">
+          O pagamento da análise não está configurado: sem ele, novas solicitações não podem ser concluídas.{" "}
+          {config.analysisPriceCents === null ? "Defina ANALYSIS_PRICE e " : "Defina "}
+          MERCADOPAGO_ACCESS_TOKEN nas variáveis de ambiente.
+        </Notice>
+      )}
 
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
         {kpis.map((k) => (

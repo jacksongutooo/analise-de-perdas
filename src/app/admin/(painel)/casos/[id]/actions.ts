@@ -272,7 +272,8 @@ const cpfConfirmed = (check: string | null) => check === "match" || check === "m
  * Aprovar documento. Para o ComprovaBet, exige o CPF compatível (leitura automática) ou a confirmação
  * da conferência manual no próprio diálogo; CPF divergente bloqueia a aprovação.
  * Os demais arquivos do mesmo ComprovaBet ainda em análise são aprovados junto (arquivos com problema
- * ou CPF divergente continuam como estão). Com o ComprovaBet aprovado, o caso segue para o pagamento.
+ * ou CPF divergente continuam como estão). Com o ComprovaBet aprovado, o caso fica pronto para a análise
+ * (já paga, no fluxo atual) ou, nos casos antigos com pagamento pendente, segue para o pagamento.
  */
 export async function approveDocument(caseId: string, formData: FormData) {
   const admin = await requireAdmin();

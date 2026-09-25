@@ -18,7 +18,9 @@ const EXPIRED = "Sua sessão de envio expirou. Envie os arquivos novamente.";
 
 export async function GET(req: Request) {
   const draft = await authenticateDraft(req);
-  if (!draft || draft.expired || draft.submittedAt) return NextResponse.json({ error: EXPIRED }, { status: 401 });
+  // Solicitação já concluída (por exemplo, com a confirmação do pagamento): os arquivos agora pertencem ao caso.
+  if (draft?.submittedAt) return NextResponse.json({ error: "Esta solicitação já foi enviada.", submitted: true }, { status: 409 });
+  if (!draft || draft.expired) return NextResponse.json({ error: EXPIRED }, { status: 401 });
   const docs = await prisma.document.findMany({ where: { draftId: draft.id }, orderBy: { createdAt: "asc" } });
   return NextResponse.json({ files: docs.map(toUploadedFileDTO), cpfMasked: draft.cpf ? maskCpf(draft.cpf) : null });
 }

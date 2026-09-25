@@ -21,8 +21,8 @@ import {
 
 const GROUP_OPTIONS = [
   { value: "group:new", label: "Validação documental" },
-  { value: "group:waiting", label: "Aguardando documentos" },
-  { value: "group:payment", label: "Pagamento" },
+  { value: "group:waiting", label: "Aguardando o cliente" },
+  { value: "group:ready", label: "Prontos para análise" },
   { value: "group:review", label: "Em análise" },
   { value: "group:done", label: "Concluídas" },
 ];

@@ -51,6 +51,11 @@ export const config = {
   analysisPriceCents: price(process.env.ANALYSIS_PRICE),
   /** Link de pagamento externo (opcional). "{protocolo}" é trocado pelo protocolo do caso. */
   paymentUrl: httpsUrl(process.env.PAYMENT_URL),
+  /** Gateway de pagamento (Mercado Pago). Sem token: pagamento só na demonstração (DEMO_MODE). */
+  mercadoPago: {
+    accessToken: process.env.MERCADOPAGO_ACCESS_TOKEN?.trim() ?? "",
+    webhookSecret: process.env.MERCADOPAGO_WEBHOOK_SECRET?.trim() ?? "",
+  },
 };
 
 export function maxUploadBytes(): number {

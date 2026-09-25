@@ -18,6 +18,7 @@ import { prisma } from "@/lib/db";
 import { config } from "@/lib/env";
 import type { ExtractionSummary } from "@/lib/extraction/process";
 import { decimalToCents, formatBRL, formatBytes, formatDate, formatDateTime, formatPhoneBR, plural } from "@/lib/format";
+import { paymentMethodLabel, providerLabel } from "@/lib/payments";
 import {
   BET_TYPE_SUMMARY,
   CASINO_GAMES,
@@ -44,6 +45,8 @@ import {
   DOCUMENT_STATUS_LABEL,
   DOCUMENT_STATUS_TONE,
   DOCUMENT_STATUS_VALUES,
+  PAYMENT_ATTEMPT_LABEL,
+  PAYMENT_ATTEMPT_TONE,
   PAYMENT_STATUS_LABEL,
   PAYMENT_STATUS_TONE,
   divergenceOf,
@@ -93,7 +96,7 @@ const OK_MESSAGES: Record<string, string> = {
   validated: "Valor validado salvo.",
   validated_clear: "Valor validado removido.",
   next: "Próximos passos salvos.",
-  approved: "Documento aprovado. O cliente vê “Documento analisado” e o caso segue para o pagamento.",
+  approved: "Documento aprovado. O cliente vê “Documento analisado” no acompanhamento.",
   cpf_mismatch: "CPF divergente registrado. O cliente foi orientado a enviar o documento correto.",
   complement: "Complementação solicitada. O cliente vê a observação no acompanhamento.",
   invalid: "Documento marcado como inválido e complementação solicitada ao cliente.",
@@ -193,12 +196,15 @@ function ComprovaBetActions({
   caseId,
   cpfMasked,
   others,
+  payment,
 }: {
   doc: ComprovaBetDoc;
   caseId: string;
   cpfMasked: string;
   /** Outros arquivos do mesmo ComprovaBet ainda em análise: são aprovados junto. */
   others: { name: string; cpfCheck: string | null }[];
+  /** Situação do pagamento do caso: define o que acontece depois da aprovação. */
+  payment: PaymentStatusValue;
 }) {
   const hidden = { documentId: doc.id };
   const confirmed = (check: string | null) => check === "match" || check === "manual_match";
@@ -218,7 +224,14 @@ function ComprovaBetActions({
         hidden={hidden}
         description={
           <>
-            <p>O cliente verá “Documento analisado” e o caso segue para o pagamento da análise.</p>
+            <p>
+              O cliente verá “Documento analisado”
+              {payment === "confirmed"
+                ? " e o caso fica pronto para iniciar a análise (já paga)."
+                : payment === "not_applicable"
+                  ? "."
+                  : " e o caso segue para o pagamento da análise."}
+            </p>
             {doc.cpfCheck === "match" && <p className="font-medium text-ok-700">Leitura automática: CPF compatível.</p>}
             {others.length > 0 && (
               <p>
@@ -304,6 +317,7 @@ export default async function CasePage({
       assignedAdmin: { select: { id: true, name: true } },
       paymentConfirmedBy: { select: { name: true } },
       agreements: { orderBy: { acceptedAt: "desc" }, take: 1 },
+      payments: { orderBy: { createdAt: "desc" } },
       platforms: { include: { platform: true } },
       declarations: { orderBy: { createdAt: "desc" }, take: 1 },
       commitment: true,
@@ -362,6 +376,7 @@ export default async function CasePage({
   const cpfMasked = c.user.cpf ? maskCpf(c.user.cpf) : "—";
   const cpfLocked = CPF_LOCKED_STATUSES.includes(status) || comprovabetDocs.some((d) => d.status === "valid");
   const agreement = c.agreements[0] ?? null;
+  const approvedPayment = c.payments.find((p) => p.status === "approved") ?? null;
   const canStart = status === "payment_confirmed" || (legacy && (status === "submitted" || status === "documents_received"));
   const latestNote = c.notes[0] ?? null;
 
@@ -473,6 +488,12 @@ export default async function CasePage({
           </Info>
           <Info label="Status do pagamento">
             <Badge tone={PAYMENT_STATUS_TONE[payment]}>{PAYMENT_STATUS_LABEL[payment]}</Badge>
+            {payment === "confirmed" && approvedPayment && (
+              <span className="mt-1 block text-xs text-muted">
+                {providerLabel(approvedPayment.provider)} · {paymentMethodLabel(approvedPayment.method)}
+                {approvedPayment.paidAt && ` · ${formatDateTime(approvedPayment.paidAt)}`}
+              </span>
+            )}
             {!legacy && payment !== "confirmed" && (
               <span className="mt-1 block text-xs text-muted">
                 {agreement ? `Condições aceitas em ${formatDateTime(agreement.acceptedAt)}` : "Condições do serviço ainda não aceitas"}
@@ -508,7 +529,7 @@ export default async function CasePage({
           <p className="text-xs font-semibold uppercase tracking-wider text-muted">Ações rápidas</p>
           <div className="mt-3 flex flex-wrap gap-2">
             {primary ? (
-              <ComprovaBetActions doc={primary} caseId={c.id} cpfMasked={cpfMasked} others={othersAwaiting(primary.id)} />
+              <ComprovaBetActions doc={primary} caseId={c.id} cpfMasked={cpfMasked} others={othersAwaiting(primary.id)} payment={payment} />
             ) : (
               <ConfirmDialog
                 label="Solicitar complemento"
@@ -525,7 +546,13 @@ export default async function CasePage({
               label="Confirmar pagamento"
               variant="secondary"
               disabled={status !== "awaiting_payment"}
-              disabledReason="Disponível depois da aprovação do documento (etapa Aguardando pagamento)."
+              disabledReason={
+                payment === "confirmed"
+                  ? approvedPayment
+                    ? `Pagamento já confirmado automaticamente (${providerLabel(approvedPayment.provider)}).`
+                    : "Pagamento já confirmado."
+                  : "Disponível para casos na etapa Aguardando pagamento."
+              }
               title="Confirmar o pagamento da análise?"
               confirmLabel="Confirmar pagamento"
               action={confirmPayment.bind(null, c.id)}
@@ -906,7 +933,7 @@ export default async function CasePage({
                       <IconEye size={15} /> Visualizar
                     </a>
                     {isComprovaBet ? (
-                      <ComprovaBetActions doc={doc} caseId={c.id} cpfMasked={cpfMasked} others={othersAwaiting(doc.id)} />
+                      <ComprovaBetActions doc={doc} caseId={c.id} cpfMasked={cpfMasked} others={othersAwaiting(doc.id)} payment={payment} />
                     ) : (
                       <>
                         <form action={setStatus}>
@@ -1015,7 +1042,13 @@ export default async function CasePage({
                 {c.paymentConfirmedAt ? (
                   <>
                     {formatDateTime(c.paymentConfirmedAt)}
-                    {c.paymentConfirmedBy && <span className="block text-xs text-muted">por {c.paymentConfirmedBy.name}</span>}
+                    <span className="block text-xs text-muted">
+                      {c.paymentConfirmedBy
+                        ? `por ${c.paymentConfirmedBy.name}`
+                        : approvedPayment
+                          ? `automaticamente (${providerLabel(approvedPayment.provider)})`
+                          : ""}
+                    </span>
                   </>
                 ) : (
                   "—"
@@ -1023,6 +1056,33 @@ export default async function CasePage({
               </Info>
               <Info label="Referência">{c.paymentReference ?? "—"}</Info>
             </dl>
+            {c.payments.length > 0 && (
+              <div className="mt-4">
+                <p className="text-xs font-semibold uppercase tracking-wider text-muted">
+                  {c.payments.length === 1 ? "Transação" : `Tentativas de pagamento (${c.payments.length})`}
+                </p>
+                <ul className="mt-2 divide-y divide-line rounded-xl border border-line">
+                  {c.payments.map((p) => (
+                    <li key={p.id} className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1.5 px-4 py-3 text-sm">
+                      <span className="min-w-0">
+                        <span className="font-medium text-ink">
+                          {providerLabel(p.provider)} · {paymentMethodLabel(p.method)}
+                        </span>
+                        <span className="block text-xs text-muted">
+                          {formatDateTime(p.paidAt ?? p.createdAt)}
+                          {p.providerPaymentId ? ` · transação ${p.providerPaymentId}` : ""}
+                          {p.statusDetail && p.status !== "approved" ? ` · ${p.statusDetail}` : ""}
+                        </span>
+                      </span>
+                      <span className="flex items-center gap-3">
+                        <span className="tabular-nums text-ink">{formatBRL(decimalToCents(p.amount) ?? 0)}</span>
+                        <Badge tone={PAYMENT_ATTEMPT_TONE[p.status]}>{PAYMENT_ATTEMPT_LABEL[p.status]}</Badge>
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
             {status === "awaiting_payment" && (
               <p className="mt-3 text-xs text-muted">
                 {payment === "awaiting_confirmation"

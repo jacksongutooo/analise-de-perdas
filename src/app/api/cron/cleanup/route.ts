@@ -16,13 +16,15 @@ export async function GET(req: Request) {
     return NextResponse.json({ error: "Não autorizado." }, { status: 401 });
   }
   const now = new Date();
+  // Rascunhos com pagamento aprovado não são apagados (a solicitação é concluída com o pagamento).
   const drafts = await prisma.caseDraft.findMany({
-    where: { submittedAt: null, expiresAt: { lt: now } },
+    where: { submittedAt: null, expiresAt: { lt: now }, payments: { none: { status: "approved" } } },
     select: { id: true },
     take: 200,
   });
-  for (const draft of drafts) await deleteDraftCompletely(draft.id);
+  let draftsRemoved = 0;
+  for (const draft of drafts) if (await deleteDraftCompletely(draft.id)) draftsRemoved++;
   const sessions = await prisma.adminSession.deleteMany({ where: { expiresAt: { lt: now } } });
   const logs = await prisma.accessLog.deleteMany({ where: { createdAt: { lt: new Date(now.getTime() - 400 * 86_400_000) } } });
-  return NextResponse.json({ draftsRemoved: drafts.length, sessionsRemoved: sessions.count, logsRemoved: logs.count });
+  return NextResponse.json({ draftsRemoved, sessionsRemoved: sessions.count, logsRemoved: logs.count });
 }

@@ -57,17 +57,22 @@ export default function TermosPage() {
       </LegalSection>
 
       <LegalSection title="4. Pagamento da análise">
-        <p>O pagamento é liberado depois da validação documental. {PAYMENT_NOTICE}</p>
-        <p>
-          Antes do pagamento, você declara que as informações e os documentos enviados são verdadeiros e pertencem ao solicitante cadastrado. O
-          aceite é registrado com data, hora e a versão destas condições.
-        </p>
+        <p>{PAYMENT_NOTICE}</p>
+        <LegalList
+          items={[
+            "O pagamento é feito ao final do formulário, depois da revisão das informações e antes do envio da solicitação. A solicitação só é registrada com a confirmação do pagamento.",
+            "O pagamento é feito por Pix ou cartão de crédito, na página do provedor de pagamento (Mercado Pago). O site não recebe nem armazena os dados do cartão.",
+            "Antes do pagamento, você declara que as informações e os documentos enviados são verdadeiros e pertencem ao solicitante cadastrado. O aceite é registrado com data, hora e a versão destas condições.",
+            "O valor corresponde ao serviço de análise documental e não depende do resultado da análise.",
+            "Por se tratar de contratação pela internet, você pode desistir em até 7 (sete) dias da contratação, nos termos do art. 49 do Código de Defesa do Consumidor, pelos canais de atendimento informados no site.",
+          ]}
+        />
       </LegalSection>
 
       <LegalSection title="5. Prazo">
         <p>
-          O prazo estimado para a análise é de até {config.reviewDays} dias a partir da confirmação do pagamento. Se forem necessários documentos
-          complementares, a análise continua após o recebimento deles e o prazo pode ser ajustado.
+          O prazo estimado para a análise é de até {config.reviewDays} dias a partir do envio da solicitação, feito com o pagamento confirmado. Se
+          forem necessários documentos complementares, a análise continua após o recebimento deles e o prazo pode ser ajustado.
         </p>
       </LegalSection>
 

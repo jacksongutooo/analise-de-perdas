@@ -2,13 +2,17 @@ import assert from "node:assert/strict";
 import { describe, test } from "node:test";
 import {
   EMPTY_DATA,
+  FIELD_SCREEN,
+  PAYMENT_REQUIRED_MESSAGE,
   SCREENS,
+  TERMS_REQUIRED_MESSAGE,
   attachedFiles,
   buildPayload,
   comprovabetFiles,
   contactErrors,
   currentSituations,
   declaredLoss,
+  firstInvalidScreen,
   loadProgress,
   resumeScreen,
   saveProgress,
@@ -21,7 +25,7 @@ import { submissionSchema } from "@/lib/cases/submission";
 import { situationValuesFor } from "@/lib/options";
 import { generateProtocol, normalizeProtocol } from "@/lib/protocol";
 import { hashPassword, verifyPassword } from "@/lib/security";
-import { clientCpfLabel, clientDocumentLabel, clientTimeline, divergenceOf } from "@/lib/status";
+import { clientCpfLabel, clientDocumentLabel, clientTimeline, divergenceOf, paidBeforeRequest } from "@/lib/status";
 
 const filled: WizardData = {
   ...EMPTY_DATA,
@@ -82,7 +86,28 @@ describe("formulário", () => {
   test("os dados do solicitante (com CPF) vêm antes do envio do ComprovaBet", () => {
     const order = SCREENS.map((s) => s.id);
     assert.ok(order.indexOf("contact") < order.indexOf("documents"));
-    assert.equal(order.at(-1), "review");
+    assert.equal(order.at(-2), "review");
+  });
+
+  test("pagamento: última tela, depois da revisão; Solicitar análise só com o pagamento aprovado", () => {
+    const order = SCREENS.map((s) => s.id);
+    assert.equal(order.at(-1), "payment");
+    assert.equal(order.indexOf("review") + 1, order.indexOf("payment"));
+    const ctx = { fileCount: 1, busy: false };
+    assert.equal(screenError("payment", { ...filled, termsAccepted: false }, ctx), TERMS_REQUIRED_MESSAGE);
+    assert.equal(screenError("payment", { ...filled, termsAccepted: true }, ctx), PAYMENT_REQUIRED_MESSAGE);
+    assert.equal(screenError("payment", { ...filled, termsAccepted: true }, { ...ctx, paid: true }), null);
+    // Antes de abrir o pagamento, todas as respostas precisam estar completas.
+    assert.equal(firstInvalidScreen(filled, ctx), null);
+    assert.equal(firstInvalidScreen({ ...filled, controlLoss: null }, ctx), "control");
+    assert.equal(firstInvalidScreen(filled, { fileCount: 0, busy: false }), "documents");
+    // Erros do servidor sobre o aceite e o pagamento levam à tela de pagamento.
+    assert.equal(FIELD_SCREEN.accept, "payment");
+    assert.equal(FIELD_SCREEN.payment, "payment");
+    // Voltando do checkout, a retomada fica na tela de pagamento.
+    assert.equal(resumeScreen("payment", { ...filled, cpf: "", cpfMasked: "***.***.***-25" }), "payment");
+    // O aceite não vai nas respostas (é registrado pelo servidor ao abrir o pagamento).
+    assert.ok(!("termsAccepted" in buildPayload({ ...filled, termsAccepted: true })));
   });
 
   test("CPF obrigatório e válido nos dados do solicitante", () => {
@@ -221,6 +246,55 @@ describe("regras do caso", () => {
 
     const done = [...reviewing, { toStatus: "completed", fromStatus: "under_review", createdAt: d(7) }];
     assert.deepEqual(states({ ...paid, status: "completed", history: done }), ["done", "done", "done", "done", "done", "done"]);
+  });
+
+  test("linha do tempo do cliente: pagamento antes da solicitação", () => {
+    const d = (day: number) => new Date(`2026-09-${String(day).padStart(2, "0")}T12:00:00Z`);
+    const base = {
+      createdAt: d(1),
+      documentSentAt: new Date(d(1).getTime() - 10 * 60_000),
+      hasComprovaBet: true,
+      documentApprovedAt: null,
+      paymentStatus: "confirmed" as const,
+      paymentConfirmedAt: new Date(d(1).getTime() - 2 * 60_000),
+    };
+    const received = [
+      { toStatus: "submitted", fromStatus: null, createdAt: d(1) },
+      { toStatus: "documents_received", fromStatus: "submitted", createdAt: d(1) },
+    ];
+    const states = (input: Parameters<typeof clientTimeline>[0]) => clientTimeline(input).map((s) => s.state);
+    const timeline = clientTimeline({ ...base, status: "documents_received", history: received });
+    assert.deepEqual(
+      timeline.map((s) => s.label),
+      ["Cadastro realizado", "ComprovaBet enviado", "Pagamento confirmado", "Validação documental", "Análise em andamento", "Análise concluída"],
+    );
+    assert.deepEqual(timeline.map((s) => s.state), ["done", "done", "done", "current", "pending", "pending"]);
+
+    // Complemento pedido na validação: a atenção fica na validação (não na análise).
+    const complement = [...received, { toStatus: "additional_documents", fromStatus: "documents_received", createdAt: d(2) }];
+    const flagged = clientTimeline({ ...base, status: "additional_documents", history: complement });
+    assert.deepEqual(flagged.map((s) => s.state), ["done", "done", "done", "attention", "pending", "pending"]);
+    assert.equal(flagged[3]?.note, "Documentação complementar necessária");
+
+    // Documento aprovado: pronto para iniciar a análise.
+    const approved = [...received, { toStatus: "payment_confirmed", fromStatus: "documents_received", createdAt: d(3) }];
+    const ready = { ...base, documentApprovedAt: d(3) };
+    assert.deepEqual(states({ ...ready, status: "payment_confirmed", history: approved }), ["done", "done", "done", "done", "pending", "pending"]);
+    assert.equal(clientTimeline({ ...ready, status: "payment_confirmed", history: approved })[3]?.date?.getTime(), d(3).getTime());
+
+    // Complemento durante a análise.
+    const reviewing = [...approved, { toStatus: "under_review", fromStatus: "payment_confirmed", createdAt: d(4) }];
+    assert.deepEqual(states({ ...ready, status: "under_review", history: reviewing }), ["done", "done", "done", "done", "current", "pending"]);
+    const duringAnalysis = [...reviewing, { toStatus: "additional_documents", fromStatus: "under_review", createdAt: d(5) }];
+    assert.deepEqual(states({ ...ready, status: "additional_documents", history: duringAnalysis }), ["done", "done", "done", "done", "attention", "pending"]);
+  });
+
+  test("pagamento antes da solicitação: tolerância de relógio, sem confundir com o fluxo anterior", () => {
+    const created = new Date("2026-09-10T12:00:00Z");
+    assert.equal(paidBeforeRequest(new Date("2026-09-10T11:58:00Z"), created), true);
+    assert.equal(paidBeforeRequest(new Date("2026-09-10T12:03:00Z"), created), true);
+    assert.equal(paidBeforeRequest(new Date("2026-09-11T09:00:00Z"), created), false);
+    assert.equal(paidBeforeRequest(null, created), false);
   });
 
   test("casos anteriores ao ComprovaBet não exibem a etapa de pagamento", () => {

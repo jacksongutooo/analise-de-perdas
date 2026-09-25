@@ -208,7 +208,7 @@ export async function getDashboard() {
     groups: {
       new: statusCount(STATUS_GROUPS.new),
       waiting: statusCount(STATUS_GROUPS.waiting),
-      payment: statusCount(STATUS_GROUPS.payment),
+      ready: statusCount(STATUS_GROUPS.ready),
       review: statusCount(STATUS_GROUPS.review),
       done: statusCount(STATUS_GROUPS.done),
     },

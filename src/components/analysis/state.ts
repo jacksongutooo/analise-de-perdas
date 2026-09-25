@@ -15,7 +15,8 @@ export type Screen =
   | "documents"
   | "commitment"
   | "contact"
-  | "review";
+  | "review"
+  | "payment";
 
 export const TOTAL_STEPS = 7;
 
@@ -36,6 +37,8 @@ export const SCREENS: { id: Screen; step: number | null; label?: string }[] = [
   { id: "documents", step: 7 },
   { id: "commitment", step: null, label: "Último passo" },
   { id: "review", step: null, label: "Revisão" },
+  // A análise é paga antes da solicitação: só com o pagamento aprovado o botão "Solicitar análise" é liberado.
+  { id: "payment", step: null, label: "Pagamento" },
 ];
 
 export type WizardData = {
@@ -65,6 +68,8 @@ export type WizardData = {
   email: string;
   whatsapp: string;
   isAdult: boolean;
+  /** Aceite das condições do serviço na tela de pagamento (registrado no servidor ao abrir o pagamento). */
+  termsAccepted: boolean;
 };
 
 export const EMPTY_DATA: WizardData = {
@@ -91,6 +96,7 @@ export const EMPTY_DATA: WizardData = {
   email: "",
   whatsapp: "",
   isAdult: false,
+  termsAccepted: false,
 };
 
 export type DraftCreds = { id: string; token: string };
@@ -103,6 +109,19 @@ export type DraftFile = {
   createdAt: string;
   manualCheck?: boolean;
 };
+
+/** Situação do pagamento da análise, como devolvida por GET /api/draft/payment. */
+export type PaymentState = {
+  status: "none" | "pending" | "approved" | "rejected" | "cancelled" | "refunded";
+  method: string | null;
+  paidAt: string | null;
+  checkoutUrl: string | null;
+  termsAcceptedAt: string | null;
+  protocol: string | null;
+};
+
+export const TERMS_REQUIRED_MESSAGE = "Para continuar, marque a declaração de aceite.";
+export const PAYMENT_REQUIRED_MESSAGE = "Conclua o pagamento para solicitar a análise.";
 
 export function draftHeaders(creds: DraftCreds): Record<string, string> {
   return { "x-draft-id": creds.id, "x-draft-token": creds.token };
@@ -161,7 +180,9 @@ export function contactErrors(d: WizardData): ContactErrors {
   return errors;
 }
 
-export function screenError(screen: Screen, d: WizardData, ctx: { fileCount: number; busy: boolean }): string | null {
+export type ScreenContext = { fileCount: number; busy: boolean; paid?: boolean };
+
+export function screenError(screen: Screen, d: WizardData, ctx: ScreenContext): string | null {
   switch (screen) {
     case "type":
       return d.betType ? null : "Escolha uma opção para continuar.";
@@ -198,7 +219,15 @@ export function screenError(screen: Screen, d: WizardData, ctx: { fileCount: num
       return Object.values(contactErrors(d))[0] ?? null;
     case "review":
       return null;
+    case "payment":
+      if (ctx.paid) return null;
+      return d.termsAccepted ? PAYMENT_REQUIRED_MESSAGE : TERMS_REQUIRED_MESSAGE;
   }
+}
+
+/** Primeira tela com resposta pendente (a revisão e o pagamento não têm respostas próprias). */
+export function firstInvalidScreen(d: WizardData, ctx: ScreenContext): Screen | null {
+  return SCREENS.find((s) => s.id !== "review" && s.id !== "payment" && screenError(s.id, d, ctx))?.id ?? null;
 }
 
 /** Liga o campo apontado pelo servidor à tela onde ele é corrigido. */
@@ -225,6 +254,8 @@ export const FIELD_SCREEN: Record<string, Screen> = {
   email: "contact",
   whatsapp: "contact",
   isAdult: "contact",
+  accept: "payment",
+  payment: "payment",
 };
 
 export function buildPayload(d: WizardData) {

@@ -5,6 +5,7 @@ import { formatCpf } from "@/lib/cpf";
 import { prisma } from "@/lib/db";
 import { contentDisposition } from "@/lib/files/names";
 import { decimalToCents } from "@/lib/format";
+import { paymentMethodLabel, providerLabel } from "@/lib/payments";
 import {
   BET_TYPE_SUMMARY,
   CASINO_GAMES,
@@ -23,6 +24,7 @@ import {
   CASE_STATUS_LABEL,
   CPF_CHECK_LABEL,
   DOCUMENT_STATUS_LABEL,
+  PAYMENT_ATTEMPT_LABEL,
   PAYMENT_STATUS_LABEL,
   type CaseStatusValue,
   type CpfCheckValue,
@@ -56,6 +58,7 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
       statusHistory: { orderBy: { createdAt: "asc" } },
       requests: { orderBy: { createdAt: "asc" } },
       documents: { orderBy: { createdAt: "asc" } },
+      payments: { orderBy: { createdAt: "asc" } },
     },
   });
   if (!c) return new Response("Caso não encontrado.", { status: 404 });
@@ -85,6 +88,14 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
       pagamento: {
         situacao: PAYMENT_STATUS_LABEL[c.paymentStatus as PaymentStatusValue],
         confirmadoEm: c.paymentConfirmedAt?.toISOString() ?? null,
+        transacoes: c.payments.map((p) => ({
+          provedor: providerLabel(p.provider),
+          forma: paymentMethodLabel(p.method),
+          situacao: PAYMENT_ATTEMPT_LABEL[p.status],
+          valor: reais(p.amount),
+          iniciadaEm: p.createdAt.toISOString(),
+          pagaEm: p.paidAt?.toISOString() ?? null,
+        })),
       },
       tipo: BET_TYPE_SUMMARY[c.betType],
       detalhe: detail,

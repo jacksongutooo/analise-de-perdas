@@ -3,7 +3,8 @@
 Site responsivo (mobile first) para receber, organizar e analisar solicitações de pessoas que tiveram
 perdas em apostas esportivas ou cassino online. O documento principal da análise é o **ComprovaBet anual
 de 2025**, em nome do próprio solicitante: o cliente responde um formulário curto, informa o CPF, envia o
-ComprovaBet, passa pela validação documental, paga a análise e acompanha o caso por protocolo. A equipe
+ComprovaBet, revisa as respostas, paga a análise (Pix ou cartão, pelo Mercado Pago), solicita a análise e
+acompanha o caso por protocolo. A equipe
 trabalha em um painel administrativo com conferência do CPF, ações rápidas com confirmação, leitura
 automática dos documentos, conferência de valores e solicitação de documentos complementares.
 
@@ -29,7 +30,8 @@ navegador. Painel na prévia: `demo@example.com` / `demonstracao-2026`.
 
 Para gerar de novo depois de alterar o site: `npm run previa` (script `scripts/build-previa.mjs`, código de apoio em
 `previa/src/`). A prévia inclui atalhos que não existem no site real: casos fictícios para abrir direto, CPF de
-exemplo e arquivos de exemplo do ComprovaBet (com o CPF informado, com outro CPF e uma foto).
+exemplo e arquivos de exemplo do ComprovaBet (com o CPF informado, com outro CPF e uma foto). O pagamento da
+análise usa o checkout simulado do modo demonstração (Pix, cartão ou recusa), sem cobrar nada.
 
 ## Rodando localmente
 
@@ -69,7 +71,8 @@ npm run dev
 
 O seed cria 11 casos fictícios (protocolos `DEMO-100001` a `DEMO-100011`), um para cada etapa do fluxo.
 Os ComprovaBets são PDFs gerados na hora, marcados como **DOCUMENTO FICTÍCIO**, com CPFs fictícios
-(`000.000.0XX-XX`), e passam pela mesma leitura de CPF dos envios reais:
+(`000.000.0XX-XX`), e passam pela mesma leitura de CPF dos envios reais. Todos (menos o caso anterior ao
+ComprovaBet) já chegam com a análise paga, como no fluxo atual, com transações do pagamento de demonstração:
 
 | Protocolo | Situação |
 |---|---|
@@ -77,12 +80,16 @@ Os ComprovaBets são PDFs gerados na hora, marcados como **DOCUMENTO FICTÍCIO**
 | `DEMO-100007` | Validação documental — CPF mascarado no documento: aguardando conferência documental |
 | `DEMO-100008` | CPF divergente marcado pela equipe — documento em nome de outra pessoa |
 | `DEMO-100003` | Complemento solicitado — ComprovaBet de outro ano (período incorreto) |
-| `DEMO-100002` | Documento aprovado — aguardando pagamento |
-| `DEMO-100009` | Condições aceitas e pagamento informado — em confirmação pela equipe |
-| `DEMO-100010` | Pagamento confirmado — pronto para iniciar a análise |
+| `DEMO-100002` | Documento aprovado — aguardando início da análise (cartão recusado antes do Pix aprovado) |
+| `DEMO-100010` | Documento aprovado — aguardando início da análise |
+| `DEMO-100009` | Análise em andamento (pago com cartão) |
 | `DEMO-100004` | Análise em andamento, com complemento enviado durante a análise |
 | `DEMO-100005` / `DEMO-100006` | Análise concluída (elementos insuficientes / concluída com valor validado) |
 | `DEMO-100011` | Caso anterior ao ComprovaBet (sem CPF e sem etapa de pagamento) |
+
+No modo demonstração, o pagamento usa um **checkout simulado** (`/pagamento/demonstracao`), com os botões
+“Pagar com Pix (simulado)”, “Pagar com cartão (simulado)” e “Simular pagamento recusado”. Essa página não
+existe fora do modo demonstração.
 
 Acesso ao painel: `demo@example.com` / `demonstracao-2026` (ou `DEMO_ADMIN_PASSWORD`). Acompanhamento do
 cliente: protocolo + e-mail da tabela exibida pelo seed.
@@ -99,10 +106,13 @@ acessos de demonstração não entram no painel real. O seed se recusa a rodar e
    escrita e exclusão apenas nesse bucket. Configure `STORAGE_DRIVER=s3` e as variáveis `S3_*`.
    Na Vercel o armazenamento local não funciona (o sistema recusa essa configuração).
 3. Cadastre as variáveis de `.env.example` no projeto da Vercel, incluindo `AUTH_SECRET` e `CRON_SECRET`
-   fortes, `NEXT_PUBLIC_SITE_URL` com o domínio final e os dados da empresa.
-4. O comando de build `vercel-build` já executa `prisma migrate deploy`.
-5. Crie o primeiro acesso rodando `npm run admin:create` localmente apontando para o banco de produção.
-6. `vercel.json` agenda a limpeza diária (`/api/cron/cleanup`), que apaga rascunhos abandonados e seus
+   fortes, `NEXT_PUBLIC_SITE_URL` com o domínio final (https) e os dados da empresa.
+4. Configure o pagamento: `ANALYSIS_PRICE`, `MERCADOPAGO_ACCESS_TOKEN` e `MERCADOPAGO_WEBHOOK_SECRET`
+   (veja “Pagamento da análise” abaixo). Sem eles, o formulário avisa que o pagamento está indisponível e
+   o painel mostra um alerta.
+5. O comando de build `vercel-build` já executa `prisma migrate deploy`.
+6. Crie o primeiro acesso rodando `npm run admin:create` localmente apontando para o banco de produção.
+7. `vercel.json` agenda a limpeza diária (`/api/cron/cleanup`), que apaga rascunhos abandonados e seus
    arquivos, sessões vencidas e registros de acesso antigos.
 
 **Limite de upload:** na Vercel cada requisição tem limite de 4,5 MB, por isso `MAX_UPLOAD_MB=4`.
@@ -110,21 +120,23 @@ Fotos maiores são reduzidas no próprio navegador antes do envio. Em servidor p
 
 ## Fluxo do cliente
 
-Cadastro → CPF do solicitante → envio do ComprovaBet → validação documental → pagamento da análise →
-análise pela equipe → acompanhamento pelo painel.
+Formulário (com o CPF e o ComprovaBet) → revisão → **pagamento da análise** → Solicitar análise →
+validação documental pela equipe → análise → acompanhamento pelo painel.
 
 - `/` — página inicial curta, com o que ter em mãos (CPF, ComprovaBet, e-mail e WhatsApp).
 - `/analise` — formulário em etapas curtas, com barra de progresso, “Voltar”, salvamento automático no navegador
   (“✓ Informações salvas”) e retomada de onde parou. A etapa 6 traz os dados do solicitante com o **CPF**
   (máscara `000.000.000-00` e dígitos verificadores); a etapa 7 é o envio do **ComprovaBet**; depois vêm o
-  compromisso voluntário e a revisão “Confira sua solicitação”.
+  compromisso voluntário, a revisão “Confira sua solicitação” e o **Pagamento da análise**: valor, aviso
+  “Importante”, aceite obrigatório e o botão “Pagar a análise” (Pix ou cartão). O botão **Solicitar análise** só aparece
+  com o pagamento aprovado.
 - `/analise/recebida` — protocolo `ANL-XXXXXX` e próximos passos.
 - `/acompanhar` — acesso com protocolo + e-mail: etapa atual, linha do tempo em 6 etapas (Cadastro realizado ·
-  ComprovaBet enviado · Validação documental · Pagamento confirmado · Análise em andamento · Análise concluída),
+  ComprovaBet enviado · Pagamento confirmado · Validação documental · Análise em andamento · Análise concluída),
   situação do documento, valores e prazo.
 - `/acompanhar/documentos` — envio de documentação complementar quando a equipe solicitar (inclusive um novo ComprovaBet).
-- `/acompanhar/pagamento` — liberado depois da validação documental: aviso “Importante”, aceite obrigatório das
-  condições (registrado com data, hora e versão) e, em seguida, o link de pagamento ou as instruções da equipe.
+- `/acompanhar/pagamento` — só para casos antigos que ficaram em “Aguardando pagamento” (pagamento depois da
+  validação, com link externo e confirmação manual pela equipe). Casos novos já chegam pagos.
 
 ## ComprovaBet e CPF
 
@@ -148,20 +160,43 @@ análise pela equipe → acompanhamento pelo painel.
 
 ## Pagamento da análise
 
-O projeto não traz um gateway de pagamento. Depois que a equipe aprova o ComprovaBet, o caso vai para
-“Aguardando pagamento” e o cliente vê a etapa de pagamento no acompanhamento:
+A análise é paga **antes** da solicitação, na última tela do formulário (depois da revisão). O gateway
+integrado é o **Mercado Pago Checkout Pro** (Pix e cartão de crédito); os dados do cartão são digitados na
+página do Mercado Pago e nunca passam pelo site.
 
-1. aviso “Importante”: o pagamento refere-se exclusivamente ao serviço de análise e não garante recuperação,
-   restituição, indenização ou recebimento de valores;
-2. checkbox obrigatório de aceite das condições — o botão só funciona depois de marcado; o aceite é gravado em
-   `service_agreements` (data e hora, versão dos termos, texto aceito, IP e navegador);
-3. link de pagamento (`PAYMENT_URL`, opcional) ou aviso de que a equipe enviará as instruções, e o botão
-   “Já fiz o pagamento” (status **Pagamento em confirmação**);
-4. a equipe confere o recebimento e clica em **Confirmar pagamento** no painel. O prazo estimado da análise
-   (`REVIEW_DAYS`) passa a contar a partir daí.
+1. A tela mostra o valor (`ANALYSIS_PRICE`), o aviso **Importante** (o pagamento refere-se exclusivamente ao
+   serviço de análise e não garante recuperação, restituição, indenização ou recebimento de valores) e o
+   **aceite obrigatório** das condições.
+2. “Pagar a análise” grava o aceite (data e hora, versão dos termos, IP e navegador) e as respostas no
+   rascunho, cria a tentativa em `payments` e leva o cliente ao checkout. O valor é sempre definido pelo servidor.
+3. O Mercado Pago avisa o site pelo webhook `/api/payments/webhook/mercadopago` (assinatura conferida com
+   `MERCADOPAGO_WEBHOOK_SECRET`). O status é sempre consultado na API do Mercado Pago — o conteúdo da
+   notificação não serve como prova — e só é aprovado se o valor pago cobrir o valor da análise.
+4. Com o pagamento aprovado, a solicitação é registrada **automaticamente**, mesmo que o cliente feche a página
+   depois de pagar. Quando ele volta ao site (retorno automático do checkout), vê “Pagamento confirmado” e toca em
+   **Solicitar análise**, que mostra o protocolo (a ação é idempotente: não duplica o caso). Se a notificação
+   atrasar, a tela consulta o Mercado Pago a cada poucos segundos.
+5. O caso nasce em “Validação documental” com o pagamento confirmado; o prazo estimado (`REVIEW_DAYS`) conta a
+   partir daí. Ao aprovar o ComprovaBet, o caso fica em **Aguardando início da análise**.
 
-Para integrar um gateway, basta marcar o pagamento como confirmado (mesmos campos de `confirmPayment`) a partir
-do webhook do provedor.
+Detalhes de segurança: rascunho com pagamento aprovado (ou aberto nas últimas 24 horas) não pode ser apagado;
+cliques repetidos reaproveitam o mesmo checkout; todas as tentativas (inclusive recusadas) ficam no caso, e o
+painel mostra provedor, forma, valor, data e identificador de cada uma. Estornos feitos no Mercado Pago
+aparecem como “Estornado” na lista de tentativas.
+
+**Configuração (Mercado Pago → Suas integrações → sua aplicação):**
+
+| Variável | Onde encontrar |
+|---|---|
+| `ANALYSIS_PRICE` | valor da análise, ex.: `197,00` |
+| `MERCADOPAGO_ACCESS_TOKEN` | Credenciais de produção → Access Token (`APP_USR-...`). Com credenciais de teste (`TEST-...`), o checkout abre no ambiente de testes |
+| `MERCADOPAGO_WEBHOOK_SECRET` | Webhooks → configure a URL `https://SEU-DOMINIO/api/payments/webhook/mercadopago`, evento **Pagamentos**, e copie a assinatura secreta |
+
+O endereço de notificação também é enviado em cada checkout quando `NEXT_PUBLIC_SITE_URL` usa https. Sem a
+assinatura secreta, as notificações ainda são processadas (a consulta à API é a prova), com um alerta no log.
+
+Casos antigos em “Aguardando pagamento” (fluxo anterior, pagamento depois da validação) continuam funcionando:
+`PAYMENT_URL` + “Já fiz o pagamento” + **Confirmar pagamento** no painel.
 
 ## Os três valores (nunca se misturam)
 
@@ -176,8 +211,9 @@ Divergências relevantes (a partir de R$ 100 e 2% do declarado) aparecem no caso
 ## Status
 
 **Caso:** `submitted` (Solicitação recebida) · `documents_received` (Validação documental) ·
-`additional_documents` (Documentação complementar necessária) · `awaiting_payment` (Aguardando pagamento) ·
-`payment_confirmed` (Pagamento confirmado) · `under_review` (Análise em andamento) ·
+`additional_documents` (Documentação complementar necessária) · `awaiting_payment` (Aguardando pagamento — só
+casos antigos) · `payment_confirmed` (Aguardando início da análise: documento aprovado e análise paga) ·
+`under_review` (Análise em andamento) ·
 `eligible` (Caso com possibilidade de prosseguimento) · `not_eligible` (Elementos insuficientes para prosseguir) ·
 `completed` (Análise concluída).
 
@@ -187,11 +223,14 @@ Aguardando conferência manual · Possível duplicidade.
 
 **Conferência do CPF (equipe):** Aguardando conferência documental · CPF compatível · CPF divergente · CPF conferido pela equipe.
 
-**Pagamento:** Pagamento pendente · Pagamento em confirmação · Pagamento confirmado · Não se aplica (casos anteriores
-ao ComprovaBet, que seguem sem a etapa de pagamento).
+**Pagamento do caso:** Pagamento confirmado (casos novos, pagos antes da solicitação) · Pagamento pendente e
+Pagamento em confirmação (casos antigos) · Não se aplica (casos anteriores ao ComprovaBet, sem etapa de pagamento).
+
+**Tentativas de pagamento (`payments`):** Aguardando pagamento · Aprovado · Recusado · Não concluído · Estornado.
 
 **Ações rápidas no painel** (todas com diálogo de confirmação): Aprovar documento · CPF divergente · Solicitar
-complemento · Documento inválido · Confirmar pagamento · Iniciar análise · Concluir análise. Nas ações de problema,
+complemento · Documento inválido · Confirmar pagamento (só casos antigos; nos novos, a confirmação é automática) ·
+Iniciar análise · Concluir análise. Nas ações de problema,
 a equipe escolhe os motivos e escreve a orientação que aparece para o cliente.
 
 ## Leitura automática dos documentos
@@ -242,8 +281,9 @@ npm test
 
 Cobrem formatação de valores, cálculo da perda, validação do formulário no servidor, CPF (dígitos verificadores,
 máscaras, busca no texto e conferência de PDFs com CPF igual, divergente, mascarado ou ausente), linha do tempo
-em 6 etapas, regras de divergência e de andamento, senhas, validação do conteúdo dos arquivos e a leitura
-automática de CSV, XLSX e PDF.
+em 6 etapas (com o pagamento antes ou depois da validação), a tela de pagamento, o Mercado Pago (status,
+assinatura das notificações, checkout e consultas com respostas simuladas), regras de divergência e de andamento,
+senhas, validação do conteúdo dos arquivos e a leitura automática de CSV, XLSX e PDF.
 
 ## Antes de publicar
 
@@ -255,8 +295,11 @@ automática de CSV, XLSX e PDF.
 - [ ] Confirmar que o bucket está privado e com backup/versionamento conforme a política de retenção.
 - [ ] Testar a leitura automática com históricos reais de cada plataforma e ajustar as regras se necessário.
 - [ ] Testar a conferência do CPF com ComprovaBets reais (PDF com texto) e conferir `COMPROVABET_YEAR`.
-- [ ] Definir o pagamento: `ANALYSIS_PRICE`, `PAYMENT_URL` (ou as instruções enviadas pela equipe) e revisar o texto
-      das condições do serviço. Ao mudar esse texto, atualize `SERVICE_TERMS_VERSION` em `src/lib/comprovabet.ts`.
+- [ ] Configurar o pagamento: `ANALYSIS_PRICE`, `MERCADOPAGO_ACCESS_TOKEN` e `MERCADOPAGO_WEBHOOK_SECRET`, e fazer
+      um pagamento real de ponta a ponta (Pix e cartão) antes de divulgar o site.
+- [ ] Definir com a assessoria jurídica a política de cancelamento e reembolso (inclusive o direito de
+      arrependimento do art. 49 do CDC, citado nos Termos) e revisar o texto das condições do serviço. Ao mudar
+      esse texto, atualize `SERVICE_TERMS_VERSION` em `src/lib/comprovabet.ts`.
 - [ ] A etapa 7 traz uma linha discreta sobre a autoexclusão oficial (gov.br/autoexclusaoapostas).
       Remova em `src/components/analysis/steps.tsx` se não fizer sentido para a operação.
 

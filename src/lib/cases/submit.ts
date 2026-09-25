@@ -1,8 +1,10 @@
 import { Prisma } from "@prisma/client";
+import { PAYMENT_NOTICE, SERVICE_TERMS_CHECKBOX, SERVICE_TERMS_VERSION } from "@/lib/comprovabet";
 import { prisma } from "@/lib/db";
 import { config } from "@/lib/env";
 import { centsToDecimal, normalizePhoneBR } from "@/lib/format";
 import { COMMITMENT_VERSION, commitmentText } from "@/lib/options";
+import { paymentMethodLabel } from "@/lib/payments/types";
 import { generateProtocol } from "@/lib/protocol";
 import { getStorage } from "@/lib/storage";
 import { resolvePlatforms } from "./platforms";
@@ -22,6 +24,16 @@ export function computeDeclaredLoss(depositsCents: number, withdrawalsCents: num
   return { raw, loss: Math.max(0, raw), needsReview: raw < 0 };
 }
 
+/** O rascunho tem o CPF e um ComprovaBet válido? (exigido para pagar e para enviar). */
+export async function assertDraftReady(draftId: string): Promise<void> {
+  const draft = await prisma.caseDraft.findUnique({ where: { id: draftId }, select: { cpf: true } });
+  if (!draft?.cpf) throw new SubmissionError("Informe seu CPF para continuar.", "cpf");
+  const ok = await prisma.document.count({
+    where: { draftId, category: "comprovabet", OR: [{ cpfCheck: null }, { cpfCheck: { not: "mismatch" } }] },
+  });
+  if (!ok) throw new SubmissionError("Envie o seu ComprovaBet para continuar.", "documents");
+}
+
 export async function submitCase(params: {
   draftId: string;
   isDemo: boolean;
@@ -34,9 +46,24 @@ export async function submitCase(params: {
   if (!platforms.length) throw new SubmissionError("Selecione ao menos uma plataforma.", "platforms");
 
   // O CPF vem do rascunho (registrado antes do envio do ComprovaBet e usado na conferência do documento).
-  const draft = await prisma.caseDraft.findUnique({ where: { id: draftId }, select: { cpf: true } });
+  const draft = await prisma.caseDraft.findUnique({
+    where: { id: draftId },
+    select: { cpf: true, termsAcceptedAt: true, termsVersion: true, termsIp: true, termsUserAgent: true },
+  });
   const cpf = draft?.cpf ?? null;
   if (!cpf) throw new SubmissionError("Informe seu CPF para continuar.", "cpf");
+
+  // A análise é paga antes da solicitação: sem pagamento aprovado (e o aceite das condições), não há envio.
+  const payment = await prisma.payment.findFirst({ where: { draftId, status: "approved" }, orderBy: { paidAt: "desc" } });
+  if (!payment) throw new SubmissionError("Conclua o pagamento para solicitar a análise.", "payment");
+  if (!draft?.termsAcceptedAt) throw new SubmissionError("Aceite as condições do serviço na tela de pagamento.", "payment");
+  const termsAcceptedAt: Date = draft.termsAcceptedAt;
+  const paidAt = payment.paidAt ?? new Date();
+  const paymentReference = [
+    payment.provider === "mercadopago" ? "Mercado Pago" : "Pagamento de demonstração",
+    paymentMethodLabel(payment.method),
+    payment.providerPaymentId ?? payment.id,
+  ].join(" · ");
 
   const draftDocs = await prisma.document.findMany({
     where: { draftId },
@@ -91,6 +118,7 @@ export async function submitCase(params: {
           const caseRow = await tx.case.create({
             data: {
               protocol,
+              createdAt: now,
               userId: user.id,
               betType: data.betType,
               sportsBetKind: data.betType === "sports" ? data.sportsKind : null,
@@ -106,6 +134,9 @@ export async function submitCase(params: {
               declaredLoss: centsToDecimal(declared.loss),
               declaredNeedsReview: declared.needsReview,
               status: "documents_received",
+              paymentStatus: "confirmed",
+              paymentConfirmedAt: paidAt,
+              paymentReference,
               privacyConsentAt: now,
               privacyConsentIp: params.ip,
               isDemo,
@@ -120,6 +151,16 @@ export async function submitCase(params: {
                   rawResult: centsToDecimal(declared.raw),
                   calculatedLoss: centsToDecimal(declared.loss),
                   needsReview: declared.needsReview,
+                },
+              },
+              agreements: {
+                create: {
+                  accepted: true,
+                  acceptedAt: termsAcceptedAt,
+                  termsVersion: draft.termsVersion ?? SERVICE_TERMS_VERSION,
+                  text: `Importante: ${PAYMENT_NOTICE}\n\n${SERVICE_TERMS_CHECKBOX}`,
+                  ip: draft.termsIp,
+                  userAgent: draft.termsUserAgent,
                 },
               },
               commitment: {
@@ -149,8 +190,10 @@ export async function submitCase(params: {
               data: { caseId: caseRow.id, draftId: null, platformId: slug ? (slugToId.get(slug) ?? null) : null },
             });
           }
-          // O CPF passa a existir só no cadastro do solicitante; o rascunho não guarda cópia.
-          await tx.caseDraft.update({ where: { id: draftId }, data: { caseId: caseRow.id, cpf: null } });
+          // Todas as tentativas de pagamento do rascunho (inclusive recusadas) ficam no histórico do caso.
+          await tx.payment.updateMany({ where: { draftId }, data: { caseId: caseRow.id } });
+          // O CPF e as respostas passam a existir só no caso; o rascunho não guarda cópia.
+          await tx.caseDraft.update({ where: { id: draftId }, data: { caseId: caseRow.id, cpf: null, answers: Prisma.DbNull } });
           return caseRow;
         },
         { timeout: 20_000 },

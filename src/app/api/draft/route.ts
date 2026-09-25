@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { isRateLimited, logAccess } from "@/lib/audit";
 import { authenticateDraft } from "@/lib/auth/draft";
-import { deleteDraftCompletely } from "@/lib/cases/drafts";
+import { deleteDraftCompletely, draftPaymentBlock } from "@/lib/cases/drafts";
 import { maskCpf, normalizeCpf } from "@/lib/cpf";
 import { prisma } from "@/lib/db";
 import { config } from "@/lib/env";
@@ -60,9 +60,16 @@ export async function PUT(req: Request) {
   return NextResponse.json({ cpfMasked: maskCpf(cpf) });
 }
 
-/** "Recomeçar": apaga o rascunho, o CPF informado e os arquivos enviados até agora. */
+/** "Recomeçar": apaga o rascunho, o CPF informado e os arquivos enviados até agora (não depois de pagar). */
 export async function DELETE(req: Request) {
   const draft = await authenticateDraft(req);
-  if (draft && !draft.submittedAt) await deleteDraftCompletely(draft.id);
+  if (draft && !draft.submittedAt && !(await deleteDraftCompletely(draft.id))) {
+    const block = await draftPaymentBlock(draft.id);
+    const error =
+      block === "pending"
+        ? "Há um pagamento em andamento para esta solicitação. Conclua ou aguarde a resposta do pagamento antes de recomeçar."
+        : "O pagamento já foi confirmado. Conclua a solicitação.";
+    return NextResponse.json({ error, field: "payment" }, { status: 409 });
+  }
   return NextResponse.json({ ok: true });
 }

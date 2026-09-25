@@ -1,7 +1,7 @@
 // Casos FICTÍCIOS de demonstração, usados pelo seed (npm run db:seed) e pela prévia navegável.
-// Os casos cobrem todas as etapas do fluxo com o ComprovaBet: validação documental, CPF divergente,
-// complemento, pagamento (pendente, em confirmação e confirmado), análise e conclusão — além de um
-// caso anterior ao ComprovaBet (sem CPF e sem pagamento), para conferir a compatibilidade.
+// Os casos seguem o fluxo atual (a análise é paga antes da solicitação) e cobrem todas as etapas:
+// validação documental, CPF divergente, complemento, pronto para análise, análise e conclusão — além de
+// um caso anterior ao ComprovaBet (sem CPF e sem pagamento), para conferir a compatibilidade.
 // Todos os registros são marcados com is_demo = true e nunca se misturam com dados reais.
 import { randomUUID } from "node:crypto";
 import type { CaseStatus, DocumentStatus } from "@prisma/client";
@@ -13,6 +13,7 @@ import { config } from "@/lib/env";
 import { processCaseDocuments } from "@/lib/extraction/process";
 import { centsToDecimal, formatAmount } from "@/lib/format";
 import { COMMITMENT_VERSION, PLATFORMS, commitmentText } from "@/lib/options";
+import { DEMO_PRICE_CENTS, paymentMethodLabel } from "@/lib/payments/types";
 import { hashPassword, sha256Hex } from "@/lib/security";
 import { getStorage } from "@/lib/storage";
 import { simplePdf } from "./simple-pdf";
@@ -97,9 +98,6 @@ type ComprovaBetSpec = { file: string; cpf: "full" | "masked" | "other_person"; 
 type DemoEvent =
   | { kind: "approve" }
   | { kind: "flag"; docStatus: Extract<DocumentStatus, "cpf_mismatch" | "complement_required" | "invalid">; reasons: string[]; message: string }
-  | { kind: "terms" }
-  | { kind: "inform_paid" }
-  | { kind: "confirm_payment" }
   | { kind: "start" }
   | { kind: "complement"; reasons: string[]; message: string; files: CsvDoc[] }
   | { kind: "finish"; to: Extract<CaseStatus, "eligible" | "not_eligible" | "completed">; message?: string };
@@ -125,6 +123,8 @@ type DemoCase = {
   /** Arquivos do fluxo anterior (antes do ComprovaBet): só no caso de compatibilidade. */
   legacyDocs?: CsvDoc[];
   events: DemoEvent[];
+  /** Pagamento da análise feito antes da solicitação (padrão: Pix aprovado na primeira tentativa). */
+  payment?: { method: "pix" | "credit_card"; rejectedFirst?: boolean };
   legacyFlow?: CaseStatus[];
   confirmIdentified?: boolean;
   validated?: number;
@@ -133,7 +133,6 @@ type DemoCase = {
 };
 
 const R = (reais: number) => reais * 100;
-const TO_PAYMENT: DemoEvent[] = [{ kind: "approve" }, { kind: "terms" }, { kind: "inform_paid" }, { kind: "confirm_payment" }];
 
 export const DEMO_CASES: DemoCase[] = [
   {
@@ -207,6 +206,7 @@ export const DEMO_CASES: DemoCase[] = [
     declared: { deposits: R(42000), withdrawals: R(12000), balance: 0 },
     comprovabet: { file: `comprovabet_${YEAR}.pdf`, cpf: "full" },
     events: [{ kind: "approve" }],
+    payment: { method: "pix", rejectedFirst: true },
   },
   {
     protocol: "DEMO-100009",
@@ -223,7 +223,8 @@ export const DEMO_CASES: DemoCase[] = [
     platforms: [{ slug: "superbet", name: "Superbet" }],
     declared: { deposits: R(16000), withdrawals: R(4000), balance: 0 },
     comprovabet: { file: `comprovabet-${YEAR}-iris.pdf`, cpf: "full" },
-    events: [{ kind: "approve" }, { kind: "terms" }, { kind: "inform_paid" }],
+    events: [{ kind: "approve" }, { kind: "start" }],
+    payment: { method: "credit_card" },
   },
   {
     protocol: "DEMO-100003",
@@ -264,7 +265,7 @@ export const DEMO_CASES: DemoCase[] = [
     platforms: [{ slug: "sportingbet", name: "Sportingbet" }],
     declared: { deposits: R(8800), withdrawals: R(1200), balance: 0 },
     comprovabet: { file: `comprovabet-${YEAR}.pdf`, cpf: "masked" },
-    events: TO_PAYMENT,
+    events: [{ kind: "approve" }],
   },
   {
     protocol: "DEMO-100004",
@@ -285,7 +286,7 @@ export const DEMO_CASES: DemoCase[] = [
     declared: { deposits: R(26000), withdrawals: R(4000), balance: 0 },
     comprovabet: { file: `comprovabet-${YEAR}-diego.pdf`, cpf: "full" },
     events: [
-      ...TO_PAYMENT,
+      { kind: "approve" },
       { kind: "start" },
       {
         kind: "complement",
@@ -314,7 +315,8 @@ export const DEMO_CASES: DemoCase[] = [
     platforms: [{ slug: "plataforma-exemplo", name: "Plataforma Exemplo", custom: true }],
     declared: { deposits: R(1800), withdrawals: R(1500), balance: 0 },
     comprovabet: { file: `comprovabet-${YEAR}-eva.pdf`, cpf: "full" },
-    events: [...TO_PAYMENT, { kind: "start" }, { kind: "finish", to: "not_eligible", message: "Análise documental concluída." }],
+    events: [{ kind: "approve" }, { kind: "start" }, { kind: "finish", to: "not_eligible", message: "Análise documental concluída." }],
+    payment: { method: "credit_card" },
     confirmIdentified: true,
   },
   {
@@ -333,7 +335,7 @@ export const DEMO_CASES: DemoCase[] = [
     declared: { deposits: R(15000), withdrawals: R(3000), balance: 0 },
     comprovabet: { file: `comprovabet-${YEAR}-fabio.pdf`, cpf: "full" },
     events: [
-      ...TO_PAYMENT,
+      { kind: "approve" },
       { kind: "start" },
       { kind: "finish", to: "eligible" },
       { kind: "finish", to: "completed", message: "Análise documental concluída." },
@@ -437,6 +439,11 @@ export async function seedDemoData(): Promise<SeededCase[]> {
     const raw = deposits - withdrawals - balance;
     const hasFlow = demo.events.length > 0 || Boolean(demo.legacyFlow?.length);
     const reviewerId = index % 2 ? analyst.id : lead.id;
+    // Fluxo atual: aceite das condições e pagamento aprovados minutos antes da solicitação.
+    const termsAt = new Date(createdAt.getTime() - 4 * 60_000);
+    const paidAt = new Date(createdAt.getTime() - 2 * 60_000);
+    const pay = demo.payment ?? { method: "pix" as const };
+    const providerPaymentId = `DEMO-${pay.method === "pix" ? "PIX" : "CARTAO"}-${String(index + 1).padStart(4, "0")}`;
     const c = await prisma.case.create({
       data: {
         protocol: demo.protocol,
@@ -454,7 +461,13 @@ export async function seedDemoData(): Promise<SeededCase[]> {
         declaredLoss: centsToDecimal(Math.max(0, raw)),
         declaredNeedsReview: raw < 0,
         status: "documents_received",
-        paymentStatus: legacy ? "not_applicable" : "pending",
+        paymentStatus: legacy ? "not_applicable" : "confirmed",
+        ...(legacy
+          ? {}
+          : {
+              paymentConfirmedAt: paidAt,
+              paymentReference: ["Pagamento de demonstração", paymentMethodLabel(pay.method), providerPaymentId].join(" · "),
+            }),
         assignedAdminId: hasFlow ? reviewerId : null,
         nextSteps: demo.nextSteps ?? null,
         privacyConsentAt: createdAt,
@@ -475,6 +488,21 @@ export async function seedDemoData(): Promise<SeededCase[]> {
             createdAt,
           },
         },
+        ...(legacy
+          ? {}
+          : {
+              agreements: {
+                create: {
+                  accepted: true,
+                  acceptedAt: termsAt,
+                  termsVersion: SERVICE_TERMS_VERSION,
+                  text: `Importante: ${PAYMENT_NOTICE}\n\n${SERVICE_TERMS_CHECKBOX}`,
+                  ip: "203.0.113.10",
+                  userAgent: "Mozilla/5.0 (demonstração)",
+                  createdAt: termsAt,
+                },
+              },
+            }),
         commitment: {
           create: {
             accepted: true,
@@ -493,6 +521,38 @@ export async function seedDemoData(): Promise<SeededCase[]> {
         },
       },
     });
+
+    if (!legacy) {
+      const amount = centsToDecimal(config.analysisPriceCents ?? DEMO_PRICE_CENTS);
+      if (pay.rejectedFirst) {
+        await prisma.payment.create({
+          data: {
+            caseId: c.id,
+            provider: "demo",
+            status: "rejected",
+            statusDetail: "recusado pelo emissor do cartão (demonstração)",
+            amount,
+            method: "credit_card",
+            providerPaymentId: `DEMO-CARTAO-${String(index + 1).padStart(4, "0")}`,
+            isDemo: true,
+            createdAt: new Date(paidAt.getTime() - 90_000),
+          },
+        });
+      }
+      await prisma.payment.create({
+        data: {
+          caseId: c.id,
+          provider: "demo",
+          status: "approved",
+          amount,
+          method: pay.method,
+          providerPaymentId,
+          paidAt,
+          isDemo: true,
+          createdAt: new Date(paidAt.getTime() - 60_000),
+        },
+      });
+    }
 
     // ComprovaBet (PDF fictício): a conferência do CPF passa pela mesma leitura usada nos envios reais.
     let comprovabetId: string | null = null;
@@ -550,7 +610,6 @@ export async function seedDemoData(): Promise<SeededCase[]> {
       await prisma.statusHistory.create({ data: { caseId: c.id, fromStatus: status, toStatus: to, changedById, publicMessage, createdAt: at } });
       status = to;
     };
-    let paymentN = 0;
     for (const [i, event] of demo.events.entries()) {
       const at = times[i] ?? new Date(now - 60_000);
       switch (event.kind) {
@@ -568,7 +627,8 @@ export async function seedDemoData(): Promise<SeededCase[]> {
             },
           });
           await prisma.caseReview.create({ data: { caseId: c.id, adminId: reviewerId, action: "document:valid", comment: comprovabetId, createdAt: at } });
-          await move("awaiting_payment", at);
+          // A análise já está paga: com o documento aprovado, o caso fica pronto para iniciar a análise.
+          await move("payment_confirmed", at);
           break;
         }
         case "flag": {
@@ -592,38 +652,6 @@ export async function seedDemoData(): Promise<SeededCase[]> {
           await move("additional_documents", at);
           break;
         }
-        case "terms":
-          await prisma.serviceAgreement.create({
-            data: {
-              caseId: c.id,
-              accepted: true,
-              acceptedAt: at,
-              termsVersion: SERVICE_TERMS_VERSION,
-              text: `Importante: ${PAYMENT_NOTICE}\n\n${SERVICE_TERMS_CHECKBOX}`,
-              ip: "203.0.113.10",
-              userAgent: "Mozilla/5.0 (demonstração)",
-              createdAt: at,
-            },
-          });
-          break;
-        case "inform_paid":
-          await prisma.case.update({ where: { id: c.id }, data: { paymentStatus: "awaiting_confirmation" } });
-          break;
-        case "confirm_payment":
-          paymentN = index + 1;
-          await prisma.case.update({
-            where: { id: c.id },
-            data: {
-              paymentStatus: "confirmed",
-              paymentConfirmedAt: at,
-              paymentConfirmedById: lead.id,
-              paymentReference: `PIX-DEMO-${String(paymentN).padStart(4, "0")}`,
-              reviewDeadline: new Date(at.getTime() + config.reviewDays * DAY),
-            },
-          });
-          await prisma.caseReview.create({ data: { caseId: c.id, adminId: lead.id, action: "payment:confirmed", createdAt: at } });
-          await move("payment_confirmed", at, null, lead.id);
-          break;
         case "start":
           await move("under_review", at);
           break;

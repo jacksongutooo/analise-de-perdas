@@ -131,7 +131,9 @@ export function DocumentsStep({
       onDraftInvalid();
       return;
     }
-    throw new Error("Não foi possível remover o arquivo. Tente novamente.");
+    // 409: pagamento em andamento — os documentos ficam como estão (a mensagem explica).
+    const body = (await res.json().catch(() => ({}))) as { error?: string };
+    throw new Error(res.status === 409 && body.error ? body.error : "Não foi possível remover o arquivo. Tente novamente.");
   }
 
   const items: FileRowItem[] = [

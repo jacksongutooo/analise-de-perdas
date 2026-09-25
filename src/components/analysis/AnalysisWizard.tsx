@@ -12,11 +12,13 @@ import {
   EMPTY_DATA,
   FIELD_SCREEN,
   SCREENS,
+  TERMS_REQUIRED_MESSAGE,
   TOTAL_STEPS,
   buildPayload,
   clearProgress,
   comprovabetFiles,
   draftHeaders,
+  firstInvalidScreen,
   loadProgress,
   resumeScreen,
   saveProgress,
@@ -24,6 +26,7 @@ import {
   selectedPlatformNames,
   type DraftCreds,
   type DraftFile,
+  type PaymentState,
   type Screen,
   type WizardData,
 } from "./state";
@@ -33,17 +36,24 @@ import {
   CommitmentStep,
   ContactStep,
   ControlStep,
+  PaymentStep,
   PeriodStep,
   PlatformsStep,
   ReviewStep,
   SituationStep,
   TypeDetailStep,
   TypeStep,
+  type PaymentSettings,
 } from "./steps";
 
-export type WizardSettings = { maxUploadMb: number; reviewDays: number; comprovabetYear: number };
+export type WizardSettings = { maxUploadMb: number; reviewDays: number; comprovabetYear: number; payment: PaymentSettings };
 
-export function AnalysisWizard({ settings }: { settings: WizardSettings }) {
+/** O checkout só pode levar a um endereço seguro (https) ou a uma página deste site. */
+function safeCheckoutUrl(url: string): boolean {
+  return /^https:\/\//i.test(url) || (url.startsWith("/") && !url.startsWith("//"));
+}
+
+export function AnalysisWizard({ settings, returning = false }: { settings: WizardSettings; returning?: boolean }) {
   const router = useRouter();
   const [ready, setReady] = useState(false);
   const [screen, setScreen] = useState<Screen>("type");
@@ -60,6 +70,12 @@ export function AnalysisWizard({ settings }: { settings: WizardSettings }) {
   const [filesLoading, setFilesLoading] = useState(false);
   const [savingCpf, setSavingCpf] = useState(false);
   const [cpfServerError, setCpfServerError] = useState<string | null>(null);
+  // Pagamento da análise (antes da solicitação).
+  const [payment, setPayment] = useState<PaymentState | null>(null);
+  const [paymentLoaded, setPaymentLoaded] = useState(false);
+  const [paymentChecking, setPaymentChecking] = useState(false);
+  const [paying, setPaying] = useState(false);
+  const [lostProgress, setLostProgress] = useState(false);
 
   const draftRef = useRef<DraftCreds | null>(null);
   const restoredDraftId = useRef<string | null>(null);
@@ -68,6 +84,8 @@ export function AnalysisWizard({ settings }: { settings: WizardSettings }) {
   const advanceTimer = useRef<number | null>(null);
   const finished = useRef(false);
   const latest = useRef<{ screen: Screen; data: WizardData; draft: DraftCreds | null } | null>(null);
+  /** A página abriu na volta do checkout (lido só na abertura). */
+  const returnedFromCheckout = useRef(returning);
 
   const setDraft = useCallback((creds: DraftCreds | null) => {
     draftRef.current = creds;
@@ -83,10 +101,18 @@ export function AnalysisWizard({ settings }: { settings: WizardSettings }) {
       restoredDraftId.current = saved.draft?.id ?? null;
       setScreen(resumeScreen(saved.screen, saved.data));
       setSavedAt(saved.savedAt);
-      setResumed(saved.screen !== "type");
+      // Na volta do checkout, a própria tela de pagamento mostra a situação: sem o aviso de retomada.
+      setResumed(saved.screen !== "type" && !returnedFromCheckout.current);
     }
+    // Voltou do pagamento em outro navegador (ou sem o preenchimento salvo): não há como ligar ao pedido aqui.
+    if (returnedFromCheckout.current && !saved?.draft) setLostProgress(true);
     setReady(true);
   }, [setDraft]);
+
+  // Tira da barra de endereços os parâmetros da volta do checkout.
+  useEffect(() => {
+    if (returning) router.replace("/analise", { scroll: false });
+  }, [returning, router]);
 
   // Salvamento automático a cada alteração.
   useEffect(() => {
@@ -118,6 +144,37 @@ export function AnalysisWizard({ settings }: { settings: WizardSettings }) {
     setNotice("Sua sessão de envio anterior expirou. Confira seu CPF e envie o ComprovaBet novamente.");
   }, [setDraft]);
 
+  /** Consulta a situação do pagamento no servidor (que confere com o gateway se a confirmação ainda não chegou). */
+  const refreshPayment = useCallback(
+    async (opts: { quiet?: boolean } = {}): Promise<PaymentState | null> => {
+      const creds = draftRef.current;
+      if (!creds) {
+        setPaymentLoaded(true);
+        return null;
+      }
+      if (!opts.quiet) setPaymentChecking(true);
+      try {
+        const res = await fetch("/api/draft/payment", { headers: draftHeaders(creds), cache: "no-store" });
+        if (draftRef.current?.id !== creds.id) return null;
+        if (res.status === 401) {
+          invalidateDraft();
+          setPayment(null);
+          return null;
+        }
+        if (!res.ok) return null;
+        const view = (await res.json()) as PaymentState;
+        setPayment(view);
+        return view;
+      } catch {
+        return null;
+      } finally {
+        setPaymentLoaded(true);
+        if (!opts.quiet) setPaymentChecking(false);
+      }
+    },
+    [invalidateDraft],
+  );
+
   // Ao retomar um preenchimento salvo, busca os arquivos já enviados (ex.: ao voltar outro dia).
   // Só para o rascunho restaurado: num rascunho novo, a lista local já é a fonte certa.
   const draftId = draft?.id ?? null;
@@ -142,6 +199,7 @@ export function AnalysisWizard({ settings }: { settings: WizardSettings }) {
         } else if (res.status === 401) {
           invalidateDraft();
         }
+        // 409: a solicitação já foi concluída com o pagamento aprovado (a tela de pagamento mostra o protocolo).
       })
       .catch(() => undefined)
       .finally(() => {
@@ -182,6 +240,53 @@ export function AnalysisWizard({ settings }: { settings: WizardSettings }) {
 
   const getDraft = useCallback(() => draftRef.current, []);
 
+  const onPaymentScreen = screen === "payment";
+  const paid = payment?.status === "approved";
+  const paymentStarted = paid || payment?.status === "pending";
+
+  // Situação do pagamento: ao retomar um rascunho salvo e sempre que a tela de pagamento abre.
+  useEffect(() => {
+    if (!ready) return;
+    if (!draftId) {
+      setPaymentLoaded(true);
+      return;
+    }
+    if (!onPaymentScreen && draftId !== restoredDraftId.current) return;
+    void refreshPayment();
+  }, [ready, draftId, onPaymentScreen, refreshPayment]);
+
+  // Enquanto o pagamento aguarda confirmação, consulta de novo a cada poucos segundos (por até 2 minutos).
+  const paymentStatus = payment?.status ?? null;
+  useEffect(() => {
+    if (!onPaymentScreen || paymentStatus !== "pending") return;
+    let rounds = 0;
+    const timer = window.setInterval(() => {
+      if (document.visibilityState !== "visible") return;
+      rounds += 1;
+      if (rounds > 30) window.clearInterval(timer);
+      else void refreshPayment({ quiet: true });
+    }, 4000);
+    const onVisible = () => {
+      if (document.visibilityState === "visible") void refreshPayment({ quiet: true });
+    };
+    document.addEventListener("visibilitychange", onVisible);
+    return () => {
+      window.clearInterval(timer);
+      document.removeEventListener("visibilitychange", onVisible);
+    };
+  }, [onPaymentScreen, paymentStatus, refreshPayment]);
+
+  // Voltou do checkout pelo botão "voltar" do navegador (página restaurada da memória).
+  useEffect(() => {
+    const onShow = (event: PageTransitionEvent) => {
+      if (!event.persisted) return;
+      setPaying(false);
+      void refreshPayment({ quiet: true });
+    };
+    window.addEventListener("pageshow", onShow);
+    return () => window.removeEventListener("pageshow", onShow);
+  }, [refreshPayment]);
+
   const index = Math.max(0, SCREENS.findIndex((s) => s.id === screen));
   const meta = SCREENS[index] ?? SCREENS[0]!;
   const platformNames = useMemo(() => selectedPlatformNames(data), [data]);
@@ -203,6 +308,11 @@ export function AnalysisWizard({ settings }: { settings: WizardSettings }) {
     if (ready) headingRef.current?.focus({ preventScroll: true });
   }, [screen, ready]);
 
+  // Com o pagamento aprovado, as respostas ficam fechadas: resta só solicitar a análise.
+  useEffect(() => {
+    if (paid && screen !== "payment") goTo("payment");
+  }, [paid, screen, goTo]);
+
   const update = useCallback((patch: Partial<WizardData>) => {
     setData((current) => ({ ...current, ...patch }));
     setError(null);
@@ -223,19 +333,96 @@ export function AnalysisWizard({ settings }: { settings: WizardSettings }) {
     advanceFrom("type");
   };
 
-  async function submit() {
+  /** Leva à tela com a resposta pendente (ou ao envio do documento, sem rascunho). Devolve false se algo falta. */
+  function answersComplete(): DraftCreds | null {
     const ctx = { fileCount: sentComprovaBet.length, busy };
-    const invalid = SCREENS.find((s) => s.id !== "review" && screenError(s.id, data, ctx));
+    const invalid = firstInvalidScreen(data, ctx);
     if (invalid) {
-      goTo(invalid.id);
+      goTo(invalid);
       setAttempted(true);
-      setError(screenError(invalid.id, data, ctx));
+      setError(screenError(invalid, data, ctx));
+      return null;
+    }
+    const creds = draftRef.current;
+    if (!creds) {
+      goTo("documents");
+      setError("Envie o seu ComprovaBet para continuar.");
+      return null;
+    }
+    return creds;
+  }
+
+  /** Erro devolvido pelo servidor: leva à tela do campo apontado (ou ao documento, se o rascunho expirou). */
+  function showServerError(status: number, body: { error?: string; field?: string }, fallback: string) {
+    const message = body.error ?? fallback;
+    if (status === 401 || status === 410) {
+      invalidateDraft();
+      goTo("documents");
+    } else {
+      const field = body.field?.split(".")[0] ?? "";
+      const target = field ? FIELD_SCREEN[field] : undefined;
+      if (field === "cpf") update({ cpfMasked: null });
+      // Depois do pagamento aprovado, as respostas ficam fechadas: o aviso aparece na própria tela de pagamento.
+      if (target && target !== screen && !paid) {
+        goTo(target);
+        setAttempted(true);
+      } else if (field === "accept") {
+        setAttempted(true);
+      }
+    }
+    setError(message);
+  }
+
+  /** Abre o pagamento: grava o aceite e as respostas no servidor e segue para o checkout. */
+  async function pay() {
+    if (paying || !settings.payment.available) return;
+    if (!data.termsAccepted) {
+      setAttempted(true);
+      setError(TERMS_REQUIRED_MESSAGE);
+      return;
+    }
+    const creds = answersComplete();
+    if (!creds) return;
+    setPaying(true);
+    setError(null);
+    let leaving = false;
+    try {
+      const res = await fetch("/api/draft/payment", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...draftHeaders(creds) },
+        body: JSON.stringify({ accept: true, answers: buildPayload(data) }),
+      });
+      const body = (await res.json().catch(() => ({}))) as { checkoutUrl?: string; alreadyPaid?: boolean; error?: string; field?: string };
+      if (res.ok && body.alreadyPaid) {
+        await refreshPayment();
+        return;
+      }
+      if (res.ok && body.checkoutUrl && safeCheckoutUrl(body.checkoutUrl)) {
+        leaving = true;
+        // Garante a volta para esta tela depois do checkout.
+        saveProgress({ v: 1, screen: "payment", data, draft: creds, savedAt: Date.now() });
+        if (body.checkoutUrl.startsWith("/")) router.push(body.checkoutUrl);
+        else window.location.assign(body.checkoutUrl);
+        return;
+      }
+      showServerError(res.status, body, "Não foi possível abrir o pagamento agora. Tente novamente.");
+    } catch {
+      setError("Sem conexão. Verifique sua internet e tente novamente.");
+    } finally {
+      if (!leaving) setPaying(false);
+    }
+  }
+
+  /** Solicita a análise (liberado só com o pagamento aprovado). */
+  async function submit() {
+    if (!paid) {
+      setError(screenError("payment", data, { fileCount: sentComprovaBet.length, busy, paid }));
       return;
     }
     const creds = draftRef.current;
     if (!creds) {
       goTo("documents");
-      setError("Envie ao menos um documento.");
+      setError("Envie o seu ComprovaBet para continuar.");
       return;
     }
     setSubmitting(true);
@@ -253,19 +440,8 @@ export function AnalysisWizard({ settings }: { settings: WizardSettings }) {
         router.replace("/analise/recebida");
         return;
       }
-      const message = body.error ?? "Não foi possível enviar agora. Tente novamente.";
-      if (res.status === 401 || res.status === 410) {
-        invalidateDraft();
-        goTo("documents");
-      } else {
-        const target = body.field ? FIELD_SCREEN[body.field.split(".")[0] ?? ""] : undefined;
-        if (body.field === "cpf") update({ cpfMasked: null });
-        if (target) {
-          goTo(target);
-          setAttempted(true);
-        }
-      }
-      setError(message);
+      if (body.field === "payment") void refreshPayment();
+      showServerError(res.status, body, "Não foi possível enviar agora. Tente novamente.");
     } catch {
       setError("Sem conexão. Verifique sua internet e tente novamente.");
     } finally {
@@ -307,16 +483,21 @@ export function AnalysisWizard({ settings }: { settings: WizardSettings }) {
   }
 
   function next() {
-    if (savingCpf) return;
+    if (savingCpf || paying || submitting) return;
     if (filesLoading && (screen === "documents" || screen === "review")) return;
+    if (screen === "payment") {
+      if (paid) void submit();
+      else void pay();
+      return;
+    }
+    if (screen === "review") {
+      if (answersComplete()) goTo("payment");
+      return;
+    }
     const message = screenError(screen, data, { fileCount: sentComprovaBet.length, busy });
     if (message) {
       setError(message);
       setAttempted(true);
-      return;
-    }
-    if (screen === "review") {
-      void submit();
       return;
     }
     const target = SCREENS[index + 1];
@@ -338,16 +519,28 @@ export function AnalysisWizard({ settings }: { settings: WizardSettings }) {
   );
 
   function back() {
+    if (paid) return;
     const previous = SCREENS[index - 1];
     if (previous) goTo(previous.id);
     else router.push("/");
   }
 
   async function restart() {
+    if (paymentStarted) return;
     if (!window.confirm("Recomeçar do início? As respostas e os arquivos enviados até agora serão apagados.")) return;
     const creds = draftRef.current;
-    if (creds) await fetch("/api/draft", { method: "DELETE", headers: draftHeaders(creds) }).catch(() => undefined);
+    if (creds) {
+      const res = await fetch("/api/draft", { method: "DELETE", headers: draftHeaders(creds) }).catch(() => null);
+      if (res?.status === 409) {
+        // Há um pagamento em andamento ou aprovado: o pedido não pode ser apagado.
+        const body = (await res.json().catch(() => ({}))) as { error?: string };
+        setError(body.error ?? "Há um pagamento em andamento para esta solicitação.");
+        void refreshPayment();
+        return;
+      }
+    }
     clearProgress();
+    setPayment(null);
     setData(EMPTY_DATA);
     setDraft(null);
     setFiles([]);
@@ -407,8 +600,30 @@ export function AnalysisWizard({ settings }: { settings: WizardSettings }) {
             goTo={goTo}
           />
         );
+      case "payment":
+        return (
+          <PaymentStep
+            {...common}
+            settings={settings.payment}
+            payment={payment}
+            checking={paymentChecking}
+            showErrors={attempted}
+            onCheck={() => void refreshPayment()}
+          />
+        );
     }
   }
+
+  const primaryLabel =
+    screen === "review"
+      ? "Ir para o pagamento"
+      : screen === "payment"
+        ? paid
+          ? "Solicitar análise"
+          : payment?.status === "pending"
+            ? "Retomar pagamento"
+            : "Pagar a análise"
+        : "Continuar";
 
   const stepLabel = meta.step ? `Etapa ${meta.step} de ${TOTAL_STEPS}` : meta.label;
 
@@ -457,12 +672,20 @@ export function AnalysisWizard({ settings }: { settings: WizardSettings }) {
           </div>
         ) : (
           <>
-            {resumed && (
+            {lostProgress && (
+              <div className="mb-6 rounded-2xl border border-line bg-surface px-4 py-3 text-sm leading-relaxed text-ink-soft" role="status">
+                Voltou do pagamento? Não encontramos o seu preenchimento neste navegador. Se o pagamento foi aprovado, a solicitação já está
+                registrada: abra esta página no mesmo aparelho e navegador em que preencheu o formulário para ver o protocolo.
+              </div>
+            )}
+            {resumed && !paid && (
               <div className="mb-6 flex items-center justify-between gap-3 rounded-2xl border border-line bg-surface px-4 py-3 text-sm">
                 <span className="text-ink-soft">Continuando de onde você parou.</span>
-                <button type="button" onClick={restart} className="font-medium text-navy-700 hover:underline">
-                  Recomeçar
-                </button>
+                {!paymentStarted && (
+                  <button type="button" onClick={restart} className="font-medium text-navy-700 hover:underline">
+                    Recomeçar
+                  </button>
+                )}
               </div>
             )}
             <div key={screen} className="step-in">
@@ -479,16 +702,24 @@ export function AnalysisWizard({ settings }: { settings: WizardSettings }) {
 
       <div className="fixed inset-x-0 bottom-0 z-20 border-t border-line bg-surface/95 pb-[env(safe-area-inset-bottom)] backdrop-blur-md">
         <div className="mx-auto flex max-w-xl gap-3 px-5 py-3">
-          <Button variant="secondary" onClick={back} className="w-[7.5rem] shrink-0" disabled={!ready || submitting || savingCpf}>
-            Voltar
-          </Button>
+          {!(onPaymentScreen && paid) && (
+            <Button variant="secondary" onClick={back} className="w-[7.5rem] shrink-0" disabled={!ready || submitting || savingCpf || paying}>
+              Voltar
+            </Button>
+          )}
           <Button
             onClick={next}
             className="flex-1"
-            disabled={!ready}
-            loading={submitting || savingCpf || (filesLoading && (screen === "documents" || screen === "review"))}
+            disabled={!ready || (onPaymentScreen && !paid && !settings.payment.available)}
+            loading={
+              submitting ||
+              savingCpf ||
+              paying ||
+              (filesLoading && (screen === "documents" || screen === "review")) ||
+              (onPaymentScreen && !paymentLoaded)
+            }
           >
-            {screen === "review" ? "Solicitar análise" : "Continuar"}
+            {primaryLabel}
           </Button>
         </div>
       </div>
