@@ -144,6 +144,7 @@ export default async function CasePage({
       statusHistory: { orderBy: { createdAt: "desc" }, include: { changedBy: { select: { name: true } } } },
       requests: { orderBy: { createdAt: "desc" }, include: { requestedBy: { select: { name: true } }, _count: { select: { documents: true } } } },
       reviews: { orderBy: { createdAt: "desc" }, take: 15, include: { admin: { select: { name: true } } } },
+      payment: true,
     },
   });
   if (!c) notFound();
@@ -346,6 +347,22 @@ export default async function CasePage({
             )}
           </div>
         </div>
+      </Section>
+
+      <Section id="pagamento" title="Pagamento">
+        {c.payment ? (
+          <dl className="grid gap-x-6 sm:grid-cols-2 lg:grid-cols-3">
+            <Info label="Valor original">{formatBRL(decimalToCents(c.payment.originalAmount))}</Info>
+            <Info label="Desconto">{formatBRL((decimalToCents(c.payment.originalAmount) ?? 0) - (decimalToCents(c.payment.finalAmount) ?? 0))}</Info>
+            <Info label="Valor pago">{formatBRL(decimalToCents(c.payment.finalAmount))}</Info>
+            <Info label="Método">{c.payment.paymentMethod === "pix" ? "PIX" : "Pagamento padrão"}</Info>
+            <Info label="Status">{c.payment.status === "paid" ? "Pago" : c.payment.status}</Info>
+            <Info label="Data">{c.payment.paidAt ? formatDateTime(c.payment.paidAt) : formatDateTime(c.payment.createdAt)}</Info>
+            <Info label="ID da transação">{c.payment.transactionId ?? "—"}</Info>
+          </dl>
+        ) : (
+          <p className="text-sm text-muted">Pagamento ainda não criado.</p>
+        )}
       </Section>
 
       <div className="grid gap-5 lg:grid-cols-2">

@@ -136,8 +136,8 @@ export function DocumentsStep({
       <StepHeading
         headingRef={headingRef}
         id="q-documents"
-        title="Comprove suas movimentações"
-        subtitle="Envie o histórico financeiro das plataformas utilizadas nos últimos 12 meses."
+        title="Comprove Bet anual do período de 2025"
+        subtitle="Envie o resumo anual das movimentações em seu nome e com o mesmo CPF informado no cadastro."
       />
       {notice && (
         <Notice tone="warn" className="mb-5">
@@ -145,24 +145,31 @@ export function DocumentsStep({
         </Notice>
       )}
 
-      <div className="rounded-2xl border border-line bg-surface px-5 py-4">
-        <p className="text-sm font-semibold text-ink">Prefira documentos baixados da própria plataforma:</p>
-        <ol className="mt-3 space-y-1.5 text-sm text-ink-soft">
+      <div className="rounded-2xl border border-line bg-surface px-4 py-4 shadow-soft sm:px-5">
+        <p className="text-sm font-semibold text-ink">O que precisamos receber:</p>
+        <ol className="mt-3 space-y-1.5 text-sm leading-relaxed text-ink-soft">
           <li className="flex gap-2.5">
-            <span className="w-4 text-muted tabular-nums">1.</span>Histórico de depósitos
+            <span className="w-4 shrink-0 text-muted tabular-nums">1.</span>Comprove Bet ou resumo anual das movimentações
           </li>
           <li className="flex gap-2.5">
-            <span className="w-4 text-muted tabular-nums">2.</span>Histórico de saques
+            <span className="w-4 shrink-0 text-muted tabular-nums">2.</span>Período de 2025
           </li>
           <li className="flex gap-2.5">
-            <span className="w-4 text-muted tabular-nums">3.</span>Histórico financeiro completo da conta
+            <span className="w-4 shrink-0 text-muted tabular-nums">3.</span>Mesmo CPF do solicitante no cadastro
           </li>
           <li className="flex gap-2.5">
-            <span className="w-4 text-muted tabular-nums">4.</span>Histórico de apostas ou jogos, somente se necessário
+            <span className="w-4 shrink-0 text-muted tabular-nums">4.</span>Documentos complementares somente se a equipe solicitar
           </li>
         </ol>
-        <p className="mt-3 border-t border-dashed border-line-strong pt-3 text-xs text-muted">
-          PDF, CSV, XLSX, JPG ou PNG, até {maxUploadMb} MB por arquivo.
+        <p className="mt-3 border-t border-dashed border-line-strong pt-3 text-xs leading-relaxed text-muted">
+          PDF, CSV, XLSX, JPG ou PNG, até {maxUploadMb} MB por arquivo. O documento deve ser legível e estar em nome do mesmo CPF informado na solicitação.
+        </p>
+      </div>
+
+      <div className="mt-4 rounded-2xl border border-ok-600/20 bg-ok-50 px-4 py-3 sm:px-5">
+        <p className="text-xs font-semibold uppercase tracking-[0.08em] text-ok-700">Importante</p>
+        <p className="mt-2 text-sm leading-relaxed text-ink-soft">
+          Para prosseguir, o Comprove Bet precisa corresponder ao mesmo CPF do solicitante e ao período informado. Caso a documentação esteja inconsistente, a equipe pode solicitar novos documentos ou encerrar o caso para revisão.
         </p>
       </div>
 

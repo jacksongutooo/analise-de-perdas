@@ -2,9 +2,9 @@ import { trackingLogout } from "@/app/acompanhar/actions";
 import type { ClientCase } from "@/lib/cases/client-view";
 import { cx } from "@/lib/cx";
 import { formatBRL, formatDate } from "@/lib/format";
-import { DEFAULT_NEXT_STEPS, REQUEST_REASONS, labelFor } from "@/lib/options";
+import { REQUEST_REASONS, labelFor } from "@/lib/options";
 import { CASE_STATUS_LABEL, CASE_STATUS_TONE, clientTimeline, type TimelineState } from "@/lib/status";
-import { IconAlert, IconCheck, IconChevronRight, IconClock, IconLogout } from "../icons";
+import { IconAlert, IconCheck, IconClock, IconLogout } from "../icons";
 import { Badge, LedgerRow, LinkButton } from "../ui";
 
 const DOT: Record<TimelineState, string> = {
@@ -15,17 +15,20 @@ const DOT: Record<TimelineState, string> = {
 };
 
 function ResultBlock({ data }: { data: ClientCase }) {
-  if (data.status === "eligible") {
+  if (data.status === "eligible" || data.status === "preliminary_review" || data.status === "waiting_payment") {
     return (
       <section className="rounded-2xl border border-ok-600/25 bg-ok-50 p-5">
-        <p className="text-lg font-semibold leading-snug text-ok-700">Identificamos elementos que permitem prosseguir com seu caso.</p>
-        <details className="group mt-4">
-          <summary className="inline-flex min-h-12 cursor-pointer list-none items-center justify-center gap-2 rounded-xl bg-ok-600 px-5 text-[0.84rem] font-semibold uppercase tracking-[0.06em] text-white hover:bg-ok-700 [&::-webkit-details-marker]:hidden">
-            Ver próximos passos
-            <IconChevronRight size={16} className="transition-transform group-open:rotate-90" />
-          </summary>
-          <p className="mt-4 whitespace-pre-line text-[0.95rem] leading-relaxed text-ink">{data.nextSteps || DEFAULT_NEXT_STEPS}</p>
-        </details>
+        <p className="text-lg font-semibold leading-snug text-ok-700">Seu caso está pronto para análise completa.</p>
+        <p className="mt-2 text-sm leading-relaxed text-ink">O índice documental representa a completude e consistência dos documentos, não uma chance de recuperação.</p>
+        <LinkButton href="/analise/pagamento" className="mt-5 w-full">Ver análise completa e pagamento</LinkButton>
+      </section>
+    );
+  }
+  if (data.status === "payment_confirmed" || data.status === "full_review") {
+    return (
+      <section className="rounded-2xl border border-ok-600/25 bg-ok-50 p-5">
+        <p className="text-lg font-semibold leading-snug text-ok-700">Pagamento confirmado</p>
+        <p className="mt-2 text-sm leading-relaxed text-ink">Seu caso foi encaminhado para análise completa. O resultado será enviado para o e-mail cadastrado em 5 a 7 dias úteis.</p>
       </section>
     );
   }
@@ -94,6 +97,20 @@ export function CaseTracking({ data }: { data: ClientCase }) {
       </div>
 
       <ResultBlock data={data} />
+
+      {data.payment && (
+        <section className="rounded-2xl border border-line bg-surface px-5 py-4 shadow-soft">
+          <h2 className="text-sm font-semibold text-ink">Pagamento</h2>
+          <p className="mt-2 text-sm text-ink-soft">
+            {data.payment.status === "paid"
+              ? "✅ Confirmado"
+              : data.payment.status === "pending" || data.payment.status === "processing"
+                ? "⏳ Aguardando confirmação"
+                : "Não confirmado"}
+          </p>
+          {data.payment.status === "paid" && <p className="mt-1 text-xs text-muted">Análise completa em andamento · 5 a 7 dias úteis</p>}
+        </section>
+      )}
 
       <section className="rounded-2xl border border-line bg-surface p-5 shadow-soft">
         <h2 className="text-sm font-semibold text-ink">Andamento</h2>

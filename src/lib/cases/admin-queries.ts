@@ -10,6 +10,7 @@ export const PAGE_SIZE = 20;
 export type CaseFilters = {
   q: string;
   status: string;
+  paymentStatus: string;
   type: string;
   platform: string;
   admin: string;
@@ -28,6 +29,7 @@ export function parseCaseFilters(sp: Record<string, string | string[] | undefine
   return {
     q: get("q"),
     status: get("status"),
+    paymentStatus: get("paymentStatus"),
     type: get("type"),
     platform: get("platform"),
     admin: get("admin"),
@@ -54,6 +56,9 @@ export function buildCaseWhere(f: CaseFilters): Prisma.CaseWhereInput {
   else if (f.status.startsWith("group:")) {
     const group = f.status.slice(6) as StatusGroup;
     if (group in STATUS_GROUPS) and.push({ status: { in: [...STATUS_GROUPS[group]] as CaseStatusValue[] } });
+  }
+  if (["pending", "paid", "failed", "refunded"].includes(f.paymentStatus)) {
+    and.push({ payment: { is: { status: f.paymentStatus as "pending" | "paid" | "failed" | "refunded" } } });
   }
   if ((BET_TYPE_VALUES as readonly string[]).includes(f.type)) and.push({ betType: f.type as BetTypeValue });
   if (f.platform) and.push({ platforms: { some: { platformId: f.platform } } });
@@ -102,6 +107,7 @@ export async function listCases(f: CaseFilters) {
         declaredLoss: true,
         identifiedLoss: true,
         identifiedSource: true,
+        payment: { select: { status: true } },
         user: { select: { fullName: true } },
         assignedAdmin: { select: { name: true } },
         platforms: { select: { platform: { select: { name: true } } } },
@@ -122,6 +128,7 @@ export async function listCases(f: CaseFilters) {
       declaredLossCents: decimalToCents(r.declaredLoss) ?? 0,
       identifiedLossCents: decimalToCents(r.identifiedLoss),
       identifiedSource: r.identifiedSource,
+      paymentStatus: r.payment?.status ?? null,
       assignee: r.assignedAdmin?.name ?? null,
     })),
   };

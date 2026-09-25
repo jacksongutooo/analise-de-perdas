@@ -39,7 +39,7 @@ export default async function CasosPage({ searchParams }: { searchParams: Promis
   const deletedRaw = Array.isArray(sp.excluido) ? sp.excluido[0] : sp.excluido;
   const deleted = deletedRaw && /^(ANL|DEMO)-\d{6}$/.test(deletedRaw) ? deletedRaw : null;
   const [{ rows, total, pages }, options] = await Promise.all([listCases(filters), getFilterOptions()]);
-  const advancedActive = [filters.type, filters.platform, filters.admin, filters.from, filters.to, filters.min, filters.max].filter(Boolean).length;
+  const advancedActive = [filters.type, filters.platform, filters.admin, filters.paymentStatus, filters.from, filters.to, filters.min, filters.max].filter(Boolean).length;
 
   return (
     <div className="space-y-5">
@@ -73,6 +73,13 @@ export default async function CasosPage({ searchParams }: { searchParams: Promis
                 </option>
               ))}
             </optgroup>
+          </Select>
+          <Select name="paymentStatus" defaultValue={filters.paymentStatus} aria-label="Pagamento" className="sm:w-52">
+            <option value="">Todos os pagamentos</option>
+            <option value="pending">Pagamento pendente</option>
+            <option value="paid">Pagamento confirmado</option>
+            <option value="failed">Pagamento falhou</option>
+            <option value="refunded">Reembolsado</option>
           </Select>
           <button type="submit" className={buttonClasses("primary", "md", "sm:w-auto")}>
             Filtrar

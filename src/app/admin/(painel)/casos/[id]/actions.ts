@@ -22,7 +22,7 @@ const MAX_CENTS = 9_999_999_999;
 async function scopedCase(caseId: string) {
   const c = await prisma.case.findFirst({
     where: { id: caseId, ...demoScope() },
-    select: { id: true, status: true, identifiedLoss: true, identifiedSource: true },
+    select: { id: true, status: true, identifiedLoss: true, identifiedSource: true, preliminaryIndex: true },
   });
   if (!c) throw new Error("Caso não encontrado.");
   return c;
@@ -57,7 +57,7 @@ export async function updateStatus(caseId: string, formData: FormData) {
   if (status === c.status && !message) back(caseId, "ok=status", "status");
 
   await prisma.$transaction([
-    prisma.case.update({ where: { id: caseId }, data: { status } }),
+    prisma.case.update({ where: { id: caseId }, data: { status, ...(status === "eligible" || status === "preliminary_review" ? { preliminaryIndex: c.preliminaryIndex || 92 } : {}) } }),
     prisma.statusHistory.create({ data: { caseId, fromStatus: c.status, toStatus: status, changedById: admin.id, publicMessage: message } }),
     // Ao sair de "documentação adicional", pedidos em aberto são encerrados.
     prisma.documentRequest.updateMany({ where: { caseId, status: "open" }, data: { status: "cancelled" } }),
