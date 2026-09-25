@@ -4,6 +4,7 @@ import { authenticateDraft } from "@/lib/auth/draft";
 import { setTrackingSession } from "@/lib/auth/tracking";
 import { submissionSchema } from "@/lib/cases/submission";
 import { SubmissionError, submitCase } from "@/lib/cases/submit";
+import { safeErrorMessage } from "@/lib/cpf";
 import { prisma } from "@/lib/db";
 import { processCaseDocuments } from "@/lib/extraction/process";
 import { clientIp, userAgent } from "@/lib/security";
@@ -60,7 +61,7 @@ export async function POST(req: Request) {
     if (error instanceof SubmissionError) {
       return NextResponse.json({ error: error.message, field: error.field }, { status: error.field === "draft" ? 409 : 422 });
     }
-    console.error("[cases] falha ao registrar solicitação", error);
+    console.error("[cases] falha ao registrar solicitação", safeErrorMessage(error));
     return NextResponse.json({ error: "Não foi possível enviar agora. Tente novamente em instantes." }, { status: 500 });
   }
 }

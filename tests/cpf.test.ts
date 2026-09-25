@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, test } from "node:test";
-import { checkCpfInText, cpfDigits, formatCpf, isValidCpf, maskCpf, maskCpfInput, normalizeCpf, yearsInText } from "@/lib/cpf";
+import { checkCpfInText, cpfDigits, formatCpf, isValidCpf, maskCpf, maskCpfInput, normalizeCpf, redactCpf, safeErrorMessage, yearsInText } from "@/lib/cpf";
 import { simplePdf } from "@/lib/demo/simple-pdf";
 import { inspectComprovaBet } from "@/lib/documents/comprovabet-check";
 import { detectFileType } from "@/lib/files/detect";
@@ -30,6 +30,13 @@ describe("CPF", () => {
     assert.equal(maskCpfInput("abc"), "");
     assert.equal(maskCpf(CPF), "***.***.***-25");
     assert.equal(maskCpf(null), "—");
+  });
+
+  test("CPF não vai para os logs", () => {
+    assert.equal(redactCpf('data: { cpf: "52998224725", nome: "Ana" }'), 'data: { cpf: "***.***.***-**", nome: "Ana" }');
+    assert.equal(redactCpf("CPF 529.982.247-25 inválido"), "CPF ***.***.***-** inválido");
+    assert.equal(redactCpf("protocolo ANL-123456"), "protocolo ANL-123456");
+    assert.ok(!safeErrorMessage(new Error("Unique constraint: 529.982.247-25")).includes("529.982.247-25"));
   });
 });
 

@@ -40,6 +40,20 @@ export function maskCpfInput(value: string): string {
   return `${d.slice(0, 3)}.${d.slice(3, 6)}.${d.slice(6, 9)}-${d.slice(9)}`;
 }
 
+/**
+ * Mascara CPFs completos (e outras sequências de 11 dígitos, como telefones) em textos que vão para logs.
+ * Erros do banco podem trazer os dados da operação na mensagem.
+ */
+export function redactCpf(text: string): string {
+  return text.replace(/(?<!\d)\d{3}[.\s]?\d{3}[.\s]?\d{3}[-\s]?\d{2}(?!\d)/g, "***.***.***-**");
+}
+
+/** Mensagem de erro segura para logs (sem CPF). */
+export function safeErrorMessage(error: unknown): string {
+  const text = error instanceof Error ? (error.stack ?? `${error.name}: ${error.message}`) : String(error);
+  return redactCpf(text).slice(0, 2000);
+}
+
 /** Versão para exibição sem expor o número: "***.***.***-25". */
 export function maskCpf(digits: string | null | undefined): string {
   const d = cpfDigits(digits ?? "");

@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { logAccess } from "@/lib/audit";
 import { authenticateDraft } from "@/lib/auth/draft";
 import { COMPROVABET_MAX_FILES, CPF_MISMATCH_MESSAGE } from "@/lib/comprovabet";
-import { maskCpf } from "@/lib/cpf";
+import { maskCpf, safeErrorMessage } from "@/lib/cpf";
 import { prisma } from "@/lib/db";
 import { checkToDocumentData, inspectComprovaBet } from "@/lib/documents/comprovabet-check";
 import { config } from "@/lib/env";
@@ -75,7 +75,7 @@ export async function POST(req: Request) {
     if (!result.ok) return NextResponse.json({ error: result.error }, { status: result.status });
     return NextResponse.json({ file: result.file }, { status: 201 });
   } catch (error) {
-    console.error("[upload] falha ao salvar arquivo", error instanceof Error ? error.message : "erro desconhecido");
+    console.error("[upload] falha ao salvar arquivo", safeErrorMessage(error));
     return NextResponse.json({ error: "Não foi possível salvar o arquivo. Tente novamente." }, { status: 500 });
   }
 }

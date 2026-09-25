@@ -3,6 +3,7 @@ import { NextResponse, after } from "next/server";
 import { logAccess } from "@/lib/audit";
 import { getTrackingCaseId } from "@/lib/auth/tracking";
 import { COMPROVABET_MAX_FILES, CPF_MISMATCH_MESSAGE } from "@/lib/comprovabet";
+import { safeErrorMessage } from "@/lib/cpf";
 import { prisma } from "@/lib/db";
 import { checkToDocumentData, inspectComprovaBet } from "@/lib/documents/comprovabet-check";
 import { config } from "@/lib/env";
@@ -89,7 +90,7 @@ export async function POST(req: Request) {
     });
     return NextResponse.json({ file: result.file }, { status: 201 });
   } catch (error) {
-    console.error("[tracking-upload] falha", error);
+    console.error("[tracking-upload] falha", safeErrorMessage(error));
     return NextResponse.json({ error: "Não foi possível salvar o arquivo. Tente novamente." }, { status: 500 });
   }
 }
