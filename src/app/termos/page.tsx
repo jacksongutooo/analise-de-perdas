@@ -50,7 +50,8 @@ export default function TermosPage() {
           items={[
             `O documento principal da análise é o ComprovaBet anual referente a ${year}.`,
             "O ComprovaBet deve estar em nome do próprio solicitante e corresponder ao CPF informado no cadastro. Quando possível, o CPF do documento é conferido automaticamente; nos demais casos, a conferência é feita pela equipe.",
-            "Se o ComprovaBet estiver completo e consistente, não serão pedidos outros documentos naquele momento. Havendo informação faltante ou inconsistência, a equipe poderá solicitar documentos complementares.",
+            "Logo depois do envio, o ComprovaBet passa por uma pré-análise automática: a leitura do PDF confere o CPF, o ano de referência e o tipo do documento, e compara as plataformas e os valores com as informações do formulário. Quando essas conferências são confirmadas, o documento é aprovado na pré-análise; quando a leitura automática não é possível (por exemplo, foto ou PDF digitalizado), a conferência é feita pela equipe. Documento de outro ano ou de outro CPF precisa ser substituído antes do pagamento.",
+            "A pré-análise automática confere o documento, não o resultado do caso. Se o ComprovaBet estiver completo e consistente, não serão pedidos outros documentos naquele momento. Havendo informação faltante ou inconsistência, a equipe poderá solicitar documentos complementares.",
             "O CPF não pode ser alterado depois que a análise documental estiver em andamento.",
           ]}
         />
@@ -71,8 +72,10 @@ export default function TermosPage() {
 
       <LegalSection title="5. Prazo">
         <p>
-          O prazo estimado para a análise é de até {config.reviewDays} dias a partir do envio da solicitação, feito com o pagamento confirmado. Se
-          forem necessários documentos complementares, a análise continua após o recebimento deles e o prazo pode ser ajustado.
+          Em até {config.reviewDays} dias úteis a partir do envio da solicitação (feito com o pagamento confirmado), a equipe entra em contato pelo
+          WhatsApp ou e-mail informados para apresentar o resultado da análise e, se o caso puder prosseguir, combinar as condições e as formas de
+          pagamento das próximas etapas. Não contam como dias úteis sábados, domingos, feriados nacionais, Carnaval e Corpus Christi. Se forem
+          necessários documentos complementares, a análise continua após o recebimento deles e o prazo pode ser ajustado.
         </p>
       </LegalSection>
 

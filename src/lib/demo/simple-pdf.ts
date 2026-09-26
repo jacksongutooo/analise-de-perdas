@@ -25,7 +25,22 @@ export function simplePdf(lines: PdfLine[]): Buffer {
     ops.push(`/${line.bold ? "F2" : "F1"} ${size} Tf 1 0 0 1 56 ${Math.max(40, y)} Tm (${encode(line.text)}) Tj`);
   }
   ops.push("ET");
-  const content = ops.join("\n");
+  return buildPdf(ops.join("\n"));
+}
+
+/** PDF sem texto selecionável (só formas cinzas), como um documento digitalizado: a leitura automática não consegue ler. */
+export function scannedPdf(): Buffer {
+  const ops = ["0.93 0.92 0.9 rg 36 36 523 770 re f", "0.35 0.36 0.4 rg"];
+  let y = 760;
+  for (let i = 0; i < 16; i++) {
+    const width = 180 + ((i * 97) % 300);
+    ops.push(`70 ${y} ${width} ${i === 1 ? 16 : 7} re f`);
+    y -= i === 1 ? 44 : 26;
+  }
+  return buildPdf(ops.join("\n"));
+}
+
+function buildPdf(content: string): Buffer {
   const objects = [
     "<< /Type /Catalog /Pages 2 0 R >>",
     "<< /Type /Pages /Kids [3 0 R] /Count 1 >>",

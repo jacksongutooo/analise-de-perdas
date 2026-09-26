@@ -1,11 +1,19 @@
 "use client";
 
 import Link from "next/link";
-import type { ReactNode, RefObject } from "react";
-import { PAYMENT_NOTICE, SERVICE_TERMS_CHECKBOX } from "@/lib/comprovabet";
+import { useEffect, useState, type ReactNode, type RefObject } from "react";
+import { PAYMENT_NOTICE, SERVICE_TERMS_CHECKBOX, contactWithinText } from "@/lib/comprovabet";
+import {
+  PRE_ANALYSIS_REVIEW_MESSAGE,
+  PRE_CHECK_LABEL,
+  PRE_CHECK_ORDER,
+  type PreAnalysis,
+  type PreAnalysisStatus,
+  type PreCheckState,
+} from "@/lib/documents/pre-analysis";
 import { cpfDigits, maskCpfInput } from "@/lib/cpf";
 import { cx } from "@/lib/cx";
-import { formatBRL, formatDateTime, maskPhoneInput, plural } from "@/lib/format";
+import { formatBRL, formatDateTime, maskPhoneInput } from "@/lib/format";
 import { paymentMethodLabel } from "@/lib/payments/types";
 import {
   BET_TYPES,
@@ -27,7 +35,7 @@ import {
   type ControlLossValue,
 } from "@/lib/options";
 import { MoneyInput } from "../MoneyInput";
-import { IconAlert, IconCheck, IconDice, IconLayers, IconLock, IconPlus, IconTrophy, IconX } from "../icons";
+import { IconAlert, IconCheck, IconDice, IconInfo, IconLayers, IconLock, IconPlus, IconSpinner, IconTrophy, IconX } from "../icons";
 import { Button, Field, LedgerRow, Notice, TextInput } from "../ui";
 import { ChoiceCard } from "./ChoiceCard";
 import { contactErrors, currentSituations, declaredLoss, type PaymentState, type Screen, type WizardData } from "./state";
@@ -522,14 +530,12 @@ export function ReviewStep({
   data,
   headingRef,
   platformNames,
-  fileCount,
   year,
   goTo,
 }: {
   data: WizardData;
   headingRef: HeadingRef;
   platformNames: string[];
-  fileCount: number | null;
   year: number;
   goTo: (s: Screen) => void;
 }) {
@@ -543,9 +549,6 @@ export function ReviewStep({
           <span className="block font-normal tabular-nums tracking-wide text-ink-soft">CPF {data.cpfMasked ?? "—"}</span>
           <span className="block font-normal text-ink-soft">{data.email}</span>
           <span className="block font-normal text-ink-soft">{data.whatsapp}</span>
-        </ReviewRow>
-        <ReviewRow label={`ComprovaBet ${year}`} onEdit={() => goTo("documents")}>
-          {fileCount === null ? <span className="font-normal text-muted">Carregando…</span> : plural(fileCount, "arquivo enviado", "arquivos enviados")}
         </ReviewRow>
         <ReviewRow label="Tipo" onEdit={() => goTo("type")}>
           {data.betType ? BET_TYPE_SUMMARY[data.betType] : "—"}
@@ -584,9 +587,178 @@ export function ReviewStep({
         </ReviewRow>
       </dl>
       <p className="mt-4 text-sm leading-relaxed text-muted">
-        Cada caso é analisado individualmente. A análise não garante recuperação, restituição ou recebimento de valores. Na próxima
-        tela, você confere o valor e faz o pagamento da análise; a solicitação é enviada depois da confirmação do pagamento.
+        Cada caso é analisado individualmente. A análise não garante recuperação, restituição ou recebimento de valores. Em seguida, envie
+        o seu ComprovaBet {year}: ele passa por uma pré-análise automática e, depois, você segue para o pagamento da análise.
       </p>
+    </>
+  );
+}
+
+// ─── Pré-análise automática do ComprovaBet ────────────────────────────────
+const CHECK_STEP_MS = 520;
+
+function usePrefersReducedMotion(): boolean {
+  const [reduced, setReduced] = useState(false);
+  useEffect(() => {
+    const query = window.matchMedia?.("(prefers-reduced-motion: reduce)");
+    if (!query) return;
+    setReduced(query.matches);
+    const onChange = () => setReduced(query.matches);
+    query.addEventListener?.("change", onChange);
+    return () => query.removeEventListener?.("change", onChange);
+  }, []);
+  return reduced;
+}
+
+const CHECK_ICON: Record<PreCheckState, { className: string; icon: ReactNode; sr: string }> = {
+  ok: { className: "border-ok-600 bg-ok-600 text-white", icon: <IconCheck size={13} strokeWidth={3} />, sr: "conferido" },
+  review: { className: "border-navy-600/50 bg-navy-50 text-navy-700", icon: <IconInfo size={13} strokeWidth={2.5} />, sr: "conferência pela equipe" },
+  fail: { className: "border-danger-700 bg-danger-50 text-danger-700", icon: <IconX size={13} strokeWidth={3} />, sr: "pendência" },
+};
+
+/**
+ * Barra da pré-análise: as conferências aparecem uma a uma (cada linha mostra o resultado real do servidor).
+ * Sem animação quando o resultado já é conhecido ou quando o aparelho pede menos movimento.
+ */
+export function AnalysisStep({
+  headingRef,
+  year,
+  result,
+  error,
+  animate,
+  onSettled,
+}: {
+  headingRef: HeadingRef;
+  year: number;
+  result: PreAnalysis | null;
+  error: string | null;
+  animate: boolean;
+  /** Chamado quando todas as conferências já estão visíveis. */
+  onSettled: () => void;
+}) {
+  const total = PRE_CHECK_ORDER.length;
+  const reduced = usePrefersReducedMotion();
+  const [revealed, setRevealed] = useState(animate ? 0 : total);
+
+  useEffect(() => {
+    if (!result) return;
+    if (!animate || reduced) {
+      setRevealed(total);
+      return;
+    }
+    if (revealed >= total) return;
+    const timer = window.setTimeout(() => setRevealed((r) => r + 1), CHECK_STEP_MS);
+    return () => window.clearTimeout(timer);
+  }, [result, revealed, animate, reduced, total]);
+
+  const settled = Boolean(result) && revealed >= total;
+  useEffect(() => {
+    if (settled) onSettled();
+  }, [settled, onSettled]);
+
+  const progress = error ? 0 : result ? Math.round((revealed / total) * 100) : 6;
+  const checks = new Map((result?.checks ?? []).map((c) => [c.key, c]));
+
+  return (
+    <>
+      <StepHeading
+        headingRef={headingRef}
+        id="q-analysis"
+        title={`Pré-análise do seu ComprovaBet ${year}`}
+        subtitle="Conferimos automaticamente o documento com as informações que você enviou. Leva poucos segundos."
+      />
+
+      <section className="rounded-2xl border border-line bg-surface p-5 shadow-soft" aria-labelledby="analysis-progress-label">
+        <div className="flex items-baseline justify-between gap-3">
+          <p id="analysis-progress-label" className="text-sm font-semibold text-ink">
+            {error ? "Pré-análise interrompida" : settled ? "Pré-análise concluída" : "Analisando o documento…"}
+          </p>
+          <span className="text-sm tabular-nums text-muted">{progress}%</span>
+        </div>
+        <div
+          className="mt-3 h-2.5 overflow-hidden rounded-full bg-navy-100"
+          role="progressbar"
+          aria-labelledby="analysis-progress-label"
+          aria-valuemin={0}
+          aria-valuemax={100}
+          aria-valuenow={progress}
+        >
+          <div
+            className={cx(
+              "h-full rounded-full transition-[width] duration-500 ease-out",
+              error ? "bg-danger-700" : settled && result?.status === "approved" ? "bg-ok-600" : "bg-navy-900",
+              !result && !error && "animate-pulse",
+            )}
+            style={{ width: `${progress}%` }}
+          />
+        </div>
+
+        <ol className="mt-4 divide-y divide-dashed divide-line">
+          {PRE_CHECK_ORDER.map((key, i) => {
+            const check = checks.get(key);
+            const shown = Boolean(result && check) && i < revealed;
+            const active = !error && !shown && i === (result ? revealed : 0);
+            const icon = shown && check ? CHECK_ICON[check.state] : null;
+            return (
+              <li key={key} className="flex gap-3 py-2.5">
+                <span
+                  className={cx(
+                    "mt-0.5 grid size-6 shrink-0 place-items-center rounded-full border-2 transition-colors",
+                    icon ? icon.className : active ? "border-navy-900 text-navy-900" : "border-line-strong text-transparent",
+                  )}
+                >
+                  {icon ? icon.icon : active ? <IconSpinner size={13} className="animate-spin" /> : null}
+                </span>
+                <div className="min-w-0">
+                  <p className={cx("text-sm font-medium", shown || active ? "text-ink" : "text-muted")}>
+                    {PRE_CHECK_LABEL[key]}
+                    {key === "year" ? ` (${year})` : ""}
+                    {icon && <span className="sr-only"> — {icon.sr}</span>}
+                  </p>
+                  {shown && check && (
+                    <p className={cx("text-xs leading-relaxed", check.state === "fail" ? "text-danger-700" : "text-ink-soft")}>{check.detail}</p>
+                  )}
+                  {active && <p className="text-xs text-muted">Conferindo…</p>}
+                </div>
+              </li>
+            );
+          })}
+        </ol>
+      </section>
+
+      <div className="mt-5" aria-live="polite">
+        {error ? (
+          <Notice tone="danger">{error}</Notice>
+        ) : settled && result ? (
+          result.status === "approved" ? (
+            <section className="rounded-2xl border border-ok-600/25 bg-ok-50 p-5">
+              <p className="flex items-center gap-2 text-lg font-semibold text-ok-700">
+                <IconCheck size={20} strokeWidth={2.5} className="shrink-0" /> Documento aprovado na pré{"\u2011"}análise
+              </p>
+              <p className="mt-2 text-[0.95rem] leading-relaxed text-ink">
+                Seu ComprovaBet {year} passou pela conferência automática: CPF, ano de referência e tipo do documento conferem com as informações
+                enviadas. Siga para o pagamento da análise.
+              </p>
+              <p className="mt-2 text-sm leading-relaxed text-ink-soft">A análise completa do caso é feita pela nossa equipe depois do pagamento.</p>
+            </section>
+          ) : result.status === "review" ? (
+            <section className="rounded-2xl border border-navy-100 bg-navy-50 p-5">
+              <p className="text-lg font-semibold text-navy-900">Pré-análise concluída</p>
+              <p className="mt-2 text-[0.95rem] leading-relaxed text-ink">{PRE_ANALYSIS_REVIEW_MESSAGE}</p>
+              <p className="mt-2 text-sm leading-relaxed text-ink-soft">
+                Você pode seguir para o pagamento. Se tiver o ComprovaBet em PDF (com texto), volte e envie-o para a conferência automática.
+              </p>
+            </section>
+          ) : (
+            <section className="rounded-2xl border border-warn-700/25 bg-warn-50 p-5">
+              <p className="flex items-center gap-2 text-lg font-semibold text-warn-700">
+                <IconAlert size={20} /> Documento com pendência
+              </p>
+              <p className="mt-2 text-[0.95rem] leading-relaxed text-ink">{result.message}</p>
+            </section>
+          )
+        ) : null}
+      </div>
     </>
   );
 }
@@ -667,6 +839,8 @@ export function PaymentStep({
   checking,
   showErrors,
   onCheck,
+  analysis,
+  reviewDays,
 }: {
   data: WizardData;
   update: Update;
@@ -676,6 +850,9 @@ export function PaymentStep({
   checking: boolean;
   showErrors: boolean;
   onCheck: () => void;
+  /** Resultado da pré-análise automática do ComprovaBet. */
+  analysis: PreAnalysisStatus | null;
+  reviewDays: number;
 }) {
   const paid = payment?.status === "approved";
   const accepted = paid || data.termsAccepted;
@@ -696,6 +873,24 @@ export function PaymentStep({
       <div className="mb-5 empty:mb-0" aria-live="polite">
         <PaymentStatus payment={payment} available={settings.available} checking={checking} onCheck={onCheck} />
       </div>
+
+      {analysis && analysis !== "blocked" && (
+        <p
+          className={cx(
+            "mb-4 flex items-start gap-2 rounded-xl px-4 py-3 text-sm font-medium",
+            analysis === "approved" ? "bg-ok-50 text-ok-700" : "bg-navy-50 text-navy-800",
+          )}
+        >
+          {analysis === "approved" ? (
+            <IconCheck size={17} strokeWidth={2.5} className="mt-0.5 shrink-0" />
+          ) : (
+            <IconInfo size={17} className="mt-0.5 shrink-0" />
+          )}
+          {analysis === "approved"
+            ? "ComprovaBet aprovado na pré-análise automática."
+            : "ComprovaBet recebido: a conferência final será feita pela nossa equipe."}
+        </p>
+      )}
 
       <div className="rounded-2xl border border-line bg-surface px-5 py-4 shadow-soft">
         <div className="flex items-baseline justify-between gap-4">
@@ -749,6 +944,15 @@ export function PaymentStep({
         </Link>
         .
       </p>
+
+      <p className="mt-6 border-t border-dashed border-line-strong pt-5 text-sm leading-relaxed text-ink-soft">
+        {nextStepsAfterPayment(reviewDays)}
+      </p>
     </>
   );
+}
+
+/** O que acontece depois do pagamento. */
+function nextStepsAfterPayment(reviewDays: number): string {
+  return `Depois do pagamento, sua solicitação é encaminhada para a nossa equipe. ${contactWithinText(reviewDays)}`;
 }

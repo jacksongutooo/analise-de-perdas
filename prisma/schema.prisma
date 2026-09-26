@@ -202,6 +202,8 @@ model Case {
   paymentConfirmedAt    DateTime?     @map("payment_confirmed_at")
   paymentConfirmedById  String?       @map("payment_confirmed_by_id")
   paymentReference      String?       @map("payment_reference")
+  /// Pré-análise automática do ComprovaBet no envio (aprovado, conferência pela equipe ou pendência).
+  preAnalysis           Json?         @map("pre_analysis")
   assignedAdminId       String?       @map("assigned_admin_id")
   nextSteps             String?       @map("next_steps")
   privacyConsentAt      DateTime      @map("privacy_consent_at")
@@ -282,6 +284,8 @@ model CaseDraft {
   termsVersion    String?   @map("terms_version")
   termsIp         String?   @map("terms_ip")
   termsUserAgent  String?   @map("terms_user_agent")
+  /// Pré-análise automática do ComprovaBet (resultado da última conferência, antes do pagamento).
+  preAnalysis     Json?     @map("pre_analysis")
 
   case      Case?      @relation(fields: [caseId], references: [id], onDelete: SetNull)
   documents Document[]

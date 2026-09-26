@@ -7,6 +7,8 @@ import { DEMO_PASSWORD } from "@/lib/demo/seed";
 import { simplePdf } from "@/lib/demo/simple-pdf";
 import { config } from "@/lib/env";
 import { formatCpf } from "@/lib/cpf";
+import { decimalToCents, formatAmount } from "@/lib/format";
+import { PLATFORMS } from "@/lib/options";
 import { prisma } from "@/lib/db";
 import { CASE_STATUS_LABEL, type CaseStatusValue } from "@/lib/status";
 import { clearStoredFiles } from "../shims/storage-local";
@@ -192,16 +194,20 @@ function AdminTip({ onClose }: { onClose: () => void }) {
 }
 
 // ─── Arquivos de exemplo (ComprovaBet fictício) ──────────────────────────
-function examplePdf(holder: string, cpfText: string): File {
+type ExampleOwner = { cpf: string; name: string; platforms: string[]; depositsCents: number | null; withdrawalsCents: number | null };
+
+/** PDF de exemplo com as plataformas e os valores informados (a pré-análise da prévia confere tudo). */
+function examplePdf(holder: string, cpfText: string, owner: ExampleOwner | null = null): File {
   const bytes = simplePdf([
     { text: "DOCUMENTO FICTÍCIO — ARQUIVO DE EXEMPLO DA PRÉVIA", bold: true, size: 9 },
     { text: `ComprovaBet — Demonstrativo anual ${YEAR}`, bold: true, size: 18, gap: 36 },
     { text: `Período de referência: 01/01/${YEAR} a 31/12/${YEAR}`, gap: 28 },
     { text: `Titular: ${holder}` },
     { text: `CPF: ${cpfText}` },
+    ...(owner?.platforms.length ? [{ text: `Plataforma: ${owner.platforms.join(", ")}` }] : []),
     { text: "Resumo do período", bold: true, size: 13, gap: 36 },
-    { text: "Total de depósitos no ano: R$ 12.300,00" },
-    { text: "Total de saques no ano: R$ 1.800,00" },
+    { text: `Total de depósitos no ano: R$ ${formatAmount(owner?.depositsCents ?? 1_230_000)}` },
+    { text: `Total de saques no ano: R$ ${formatAmount(owner?.withdrawalsCents ?? 180_000)}` },
     { text: "Este arquivo não tem validade e não representa um documento real.", size: 9, gap: 44 },
   ]);
   const slug = cpfText === OTHER_CPF ? "outro-cpf" : "seu-cpf";
@@ -225,23 +231,51 @@ async function examplePhoto(): Promise<File> {
   return new File([blob], `foto-comprovabet-${YEAR}.jpg`, { type: "image/jpeg" });
 }
 
-/** CPF e nome que a prévia usa nos exemplos: do formulário em andamento ou do caso acompanhado. */
-async function exampleOwner(pathname: string): Promise<{ cpf: string; name: string } | null> {
+/** CPF, nome, plataformas e valores que a prévia usa nos exemplos: do formulário em andamento ou do caso acompanhado. */
+async function exampleOwner(pathname: string): Promise<ExampleOwner | null> {
   if (pathname === "/acompanhar/documentos") {
     const raw = cookieStore.get(TRACKING_COOKIE)?.value;
     const caseId = raw?.split(".")[0];
     if (!caseId) return null;
-    const c = (await prisma.case.findUnique({ where: { id: caseId }, select: { user: { select: { cpf: true, fullName: true } } } })) as {
+    const c = (await prisma.case.findUnique({
+      where: { id: caseId },
+      select: {
+        declaredDeposits: true,
+        declaredWithdrawals: true,
+        user: { select: { cpf: true, fullName: true } },
+        platforms: { select: { platform: { select: { name: true } } } },
+      },
+    })) as {
+      declaredDeposits: string;
+      declaredWithdrawals: string;
       user: { cpf: string | null; fullName: string };
+      platforms: { platform: { name: string } }[];
     } | null;
-    return c?.user.cpf ? { cpf: c.user.cpf, name: c.user.fullName } : null;
+    if (!c?.user.cpf) return null;
+    return {
+      cpf: c.user.cpf,
+      name: c.user.fullName,
+      platforms: c.platforms.map((p) => p.platform.name),
+      depositsCents: decimalToCents(c.declaredDeposits),
+      withdrawalsCents: decimalToCents(c.declaredWithdrawals),
+    };
   }
   try {
     const saved = JSON.parse(window.localStorage.getItem("analise:v1") ?? "null");
     const draftId = saved?.draft?.id as string | undefined;
     if (!draftId) return null;
     const draft = (await prisma.caseDraft.findUnique({ where: { id: draftId }, select: { cpf: true } })) as { cpf: string | null } | null;
-    return draft?.cpf ? { cpf: draft.cpf, name: saved?.data?.fullName?.trim() || "Solicitante da Prévia" } : null;
+    if (!draft?.cpf) return null;
+    const data = saved?.data ?? {};
+    const platforms = PLATFORMS.filter((p) => (data.platforms ?? []).includes(p.slug)).map((p) => p.name);
+    if (data.otherPlatformEnabled) platforms.push(...(data.customPlatforms ?? []).map((n: string) => String(n).trim()).filter(Boolean));
+    return {
+      cpf: draft.cpf,
+      name: data.fullName?.trim() || "Solicitante da Prévia",
+      platforms,
+      depositsCents: typeof data.depositsCents === "number" ? data.depositsCents : null,
+      withdrawalsCents: typeof data.withdrawalsCents === "number" ? data.withdrawalsCents : null,
+    };
   } catch {
     return null;
   }
@@ -293,7 +327,9 @@ function ExamplesTip({ pathname }: { pathname: string }) {
       if (kind === "photo") return sendToUpload(await examplePhoto());
       const owner = await exampleOwner(pathname);
       if (!owner) return toast("Informe e continue a etapa “Seus dados” (com o CPF) antes de usar os exemplos.");
-      sendToUpload(examplePdf(kind === "mine" ? owner.name : "Outra Pessoa Fictícia", kind === "mine" ? formatCpf(owner.cpf) : OTHER_CPF));
+      sendToUpload(
+        kind === "mine" ? examplePdf(owner.name, formatCpf(owner.cpf), owner) : examplePdf("Outra Pessoa Fictícia", OTHER_CPF),
+      );
     } finally {
       setBusy(false);
       setOpen(false);

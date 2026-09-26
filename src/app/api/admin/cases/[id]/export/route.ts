@@ -5,6 +5,7 @@ import { formatCpf } from "@/lib/cpf";
 import { prisma } from "@/lib/db";
 import { contentDisposition } from "@/lib/files/names";
 import { decimalToCents } from "@/lib/format";
+import { PRE_ANALYSIS_STATUS_LABEL, PRE_CHECK_LABEL, parsePreAnalysis } from "@/lib/documents/pre-analysis";
 import { paymentMethodLabel, providerLabel } from "@/lib/payments";
 import {
   BET_TYPE_SUMMARY,
@@ -102,6 +103,16 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
       plataformas: c.platforms.map((p) => p.platform.name),
       tempoDeUso: labelFor(PERIODS, c.period),
       controleDasApostas: c.controlLoss ? CONTROL_LOSS_SUMMARY[c.controlLoss] : null,
+      preAnaliseAutomatica: (() => {
+        const pre = parsePreAnalysis(c.preAnalysis);
+        return pre
+          ? {
+              resultado: PRE_ANALYSIS_STATUS_LABEL[pre.status],
+              feitaEm: pre.analyzedAt,
+              conferencias: pre.checks.map((check) => ({ item: PRE_CHECK_LABEL[check.key], resultado: check.detail })),
+            }
+          : null;
+      })(),
       situacoes: c.situations.map((s) => labelFor(SITUATIONS, s)),
       situacaoDescrita: c.situationOther,
     },

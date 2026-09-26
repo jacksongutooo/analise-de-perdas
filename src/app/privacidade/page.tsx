@@ -38,6 +38,7 @@ export default function PrivacidadePage() {
           items={[
             "Analisar a documentação enviada e classificar o seu caso.",
             "Conferir se o ComprovaBet pertence a você, comparando o CPF do documento com o CPF informado.",
+            "Fazer a pré-análise automática do ComprovaBet: leitura do texto do PDF para conferir o CPF, o ano de referência e o tipo do documento, e comparar as plataformas e os valores com as suas respostas.",
             "Registrar o aceite das condições e confirmar o pagamento da análise com o provedor de pagamento.",
             "Conferir os valores informados com os documentos.",
             "Informar o andamento e o resultado da análise pelo painel de acompanhamento, e-mail ou WhatsApp.",
@@ -102,7 +103,8 @@ export default function PrivacidadePage() {
             "portabilidade dos dados;",
             "eliminação dos dados tratados com base no consentimento, ressalvadas as hipóteses legais de conservação;",
             "informação sobre com quem compartilhamos os dados;",
-            "revogação do consentimento.",
+            "revogação do consentimento;",
+            "revisão, por uma pessoa da equipe, de decisões tomadas apenas com base em tratamento automatizado, como a pré-análise do documento (art. 20 da LGPD).",
           ]}
         />
         <p>

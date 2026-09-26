@@ -1,6 +1,9 @@
 import { Prisma } from "@prisma/client";
+import { addBusinessDays } from "@/lib/business-days";
 import { PAYMENT_NOTICE, SERVICE_TERMS_CHECKBOX, SERVICE_TERMS_VERSION } from "@/lib/comprovabet";
 import { prisma } from "@/lib/db";
+import { AUTO_APPROVAL_NOTE } from "@/lib/documents/pre-analysis";
+import { runPreAnalysis } from "@/lib/documents/pre-analysis-run";
 import { config } from "@/lib/env";
 import { centsToDecimal, normalizePhoneBR } from "@/lib/format";
 import { COMMITMENT_VERSION, commitmentText } from "@/lib/options";
@@ -81,8 +84,20 @@ export async function submitCase(params: {
   if (!phone) throw new SubmissionError("Informe um WhatsApp válido com DDD.", "whatsapp");
   const balance = data.hasBalance ? (data.balanceCents ?? 0) : 0;
   const declared = computeDeclaredLoss(data.depositsCents, data.withdrawalsCents, balance);
+
+  // Pré-análise automática com os arquivos atuais. Aprovada: os arquivos conferidos entram aprovados e o caso já
+  // fica pronto para a análise. Sem ela (ou com pendência), a validação documental fica com a equipe — o pagamento
+  // já foi feito, então o envio nunca é recusado aqui.
+  const pre = await runPreAnalysis(draftId, data).catch((error) => {
+    console.error("[cases] falha na pré-análise no envio", error instanceof Error ? error.message : "erro desconhecido");
+    return null;
+  });
+  const autoApproved = pre?.status === "approved";
+  const autoApprovedIds = new Set(autoApproved ? pre.approvedIds : []);
+
   const now = new Date();
-  const reviewDeadline = new Date(now.getTime() + config.reviewDays * 86_400_000);
+  // Prazo em dias úteis a partir do envio (feito com o pagamento confirmado).
+  const reviewDeadline = addBusinessDays(now, config.reviewDays);
 
   for (let attempt = 0; attempt < 5; attempt++) {
     const protocol = generateProtocol(isDemo);
@@ -133,10 +148,11 @@ export async function submitCase(params: {
               declaredBalance: centsToDecimal(balance),
               declaredLoss: centsToDecimal(declared.loss),
               declaredNeedsReview: declared.needsReview,
-              status: "documents_received",
+              status: autoApproved ? "payment_confirmed" : "documents_received",
               paymentStatus: "confirmed",
               paymentConfirmedAt: paidAt,
               paymentReference,
+              preAnalysis: pre ? (pre as unknown as Prisma.InputJsonValue) : Prisma.DbNull,
               privacyConsentAt: now,
               privacyConsentIp: params.ip,
               isDemo,
@@ -177,6 +193,10 @@ export async function submitCase(params: {
                 create: [
                   { toStatus: "submitted", createdAt: now },
                   { fromStatus: "submitted", toStatus: "documents_received", createdAt: new Date(now.getTime() + 1000) },
+                  // Documento aprovado na pré-análise automática: validação documental concluída.
+                  ...(autoApproved
+                    ? [{ fromStatus: "documents_received" as const, toStatus: "payment_confirmed" as const, createdAt: new Date(now.getTime() + 2000) }]
+                    : []),
                 ],
               },
             },
@@ -187,7 +207,13 @@ export async function submitCase(params: {
             const slug = aliases.get((doc.platformName ?? "").toLowerCase());
             await tx.document.update({
               where: { id: doc.id },
-              data: { caseId: caseRow.id, draftId: null, platformId: slug ? (slugToId.get(slug) ?? null) : null },
+              data: {
+                caseId: caseRow.id,
+                draftId: null,
+                platformId: slug ? (slugToId.get(slug) ?? null) : null,
+                // Só os arquivos que passaram nas conferências automáticas; os demais ficam para a equipe.
+                ...(autoApprovedIds.has(doc.id) ? { status: "valid" as const, reviewedAt: now, reviewNote: AUTO_APPROVAL_NOTE } : {}),
+              },
             });
           }
           // Todas as tentativas de pagamento do rascunho (inclusive recusadas) ficam no histórico do caso.

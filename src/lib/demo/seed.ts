@@ -1,14 +1,18 @@
 // Casos FICTÍCIOS de demonstração, usados pelo seed (npm run db:seed) e pela prévia navegável.
-// Os casos seguem o fluxo atual (a análise é paga antes da solicitação) e cobrem todas as etapas:
-// validação documental, CPF divergente, complemento, pronto para análise, análise e conclusão — além de
-// um caso anterior ao ComprovaBet (sem CPF e sem pagamento), para conferir a compatibilidade.
+// Os casos seguem o fluxo atual: pré-análise automática do ComprovaBet, pagamento antes da solicitação e
+// prazo em dias úteis. Cobrem aprovação automática, conferência pela equipe (CPF mascarado ou PDF digitalizado),
+// CPF divergente, complemento, análise e conclusão — além de um caso anterior ao ComprovaBet (sem CPF e sem
+// pagamento), para conferir a compatibilidade.
 // Todos os registros são marcados com is_demo = true e nunca se misturam com dados reais.
 import { randomUUID } from "node:crypto";
-import type { CaseStatus, DocumentStatus } from "@prisma/client";
+import type { CaseStatus, DocumentStatus, Prisma } from "@prisma/client";
+import { addBusinessDays } from "@/lib/business-days";
 import { CPF_MISMATCH_MESSAGE, PAYMENT_NOTICE, SERVICE_TERMS_CHECKBOX, SERVICE_TERMS_VERSION } from "@/lib/comprovabet";
 import { formatCpf } from "@/lib/cpf";
 import { prisma } from "@/lib/db";
 import { checkToDocumentData, inspectComprovaBet } from "@/lib/documents/comprovabet-check";
+import { AUTO_APPROVAL_NOTE, type PreAnalysis } from "@/lib/documents/pre-analysis";
+import { aggregatePreAnalysis, evaluateComprovaBet } from "@/lib/documents/pre-analysis-check";
 import { config } from "@/lib/env";
 import { processCaseDocuments } from "@/lib/extraction/process";
 import { centsToDecimal, formatAmount } from "@/lib/format";
@@ -16,7 +20,7 @@ import { COMMITMENT_VERSION, PLATFORMS, commitmentText } from "@/lib/options";
 import { DEMO_PRICE_CENTS, paymentMethodLabel } from "@/lib/payments/types";
 import { hashPassword, sha256Hex } from "@/lib/security";
 import { getStorage } from "@/lib/storage";
-import { simplePdf } from "./simple-pdf";
+import { scannedPdf, simplePdf, type PdfLine } from "./simple-pdf";
 
 const DAY = 86_400_000;
 const HOUR = 3_600_000;
@@ -73,9 +77,9 @@ function demoCpf(base: string): string {
   return d.join("");
 }
 
-/** ComprovaBet FICTÍCIO em PDF com texto selecionável — só para demonstrar a leitura do CPF. */
-function comprovabetPdf(o: { holder: string; cpfText: string; year: number; platform: string; deposits: number; withdrawals: number; balance: number }) {
-  return simplePdf([
+/** Texto do ComprovaBet FICTÍCIO (PDF com texto selecionável) — só para demonstrar a leitura automática. */
+function comprovabetLines(o: { holder: string; cpfText: string; year: number; platform: string; deposits: number; withdrawals: number; balance: number }): PdfLine[] {
+  return [
     { text: "DOCUMENTO FICTÍCIO — GERADO APENAS PARA DEMONSTRAÇÃO DO SISTEMA", bold: true, size: 9 },
     { text: `ComprovaBet — Demonstrativo anual ${o.year}`, bold: true, size: 18, gap: 36 },
     { text: `Período de referência: 01/01/${o.year} a 31/12/${o.year}`, gap: 28 },
@@ -87,13 +91,13 @@ function comprovabetPdf(o: { holder: string; cpfText: string; year: number; plat
     { text: `Total de saques no ano: R$ ${formatAmount(o.withdrawals)}` },
     { text: `Saldo final: R$ ${formatAmount(o.balance)}` },
     { text: "Este arquivo não tem validade e não representa um documento real.", size: 9, gap: 44 },
-  ]);
+  ];
 }
 
 type CsvDoc = { platform: string; deposits: number; withdrawals: number; balance: number; name: string };
 
-/** Como o documento aparece: CPF completo, mascarado (só alguns dígitos) ou de outra pessoa (mascarado). */
-type ComprovaBetSpec = { file: string; cpf: "full" | "masked" | "other_person"; year?: number };
+/** Como o documento aparece: CPF completo, mascarado (só alguns dígitos), de outra pessoa (mascarado) ou digitalizado (sem texto). */
+type ComprovaBetSpec = { file: string; cpf: "full" | "masked" | "other_person" | "scanned"; year?: number };
 
 type DemoEvent =
   | { kind: "approve" }
@@ -205,7 +209,7 @@ export const DEMO_CASES: DemoCase[] = [
     ],
     declared: { deposits: R(42000), withdrawals: R(12000), balance: 0 },
     comprovabet: { file: `comprovabet_${YEAR}.pdf`, cpf: "full" },
-    events: [{ kind: "approve" }],
+    events: [],
     payment: { method: "pix", rejectedFirst: true },
   },
   {
@@ -223,7 +227,7 @@ export const DEMO_CASES: DemoCase[] = [
     platforms: [{ slug: "superbet", name: "Superbet" }],
     declared: { deposits: R(16000), withdrawals: R(4000), balance: 0 },
     comprovabet: { file: `comprovabet-${YEAR}-iris.pdf`, cpf: "full" },
-    events: [{ kind: "approve" }, { kind: "start" }],
+    events: [{ kind: "start" }],
     payment: { method: "credit_card" },
   },
   {
@@ -240,13 +244,13 @@ export const DEMO_CASES: DemoCase[] = [
     situations: ["platform_incentives", "platform_problem"],
     platforms: [{ slug: "superbet", name: "Superbet" }],
     declared: { deposits: R(9000), withdrawals: R(1000), balance: R(300) },
-    comprovabet: { file: "comprovabet-carla.pdf", cpf: "full", year: YEAR - 1 },
+    comprovabet: { file: "comprovabet-digitalizado.pdf", cpf: "scanned" },
     events: [
       {
         kind: "flag",
         docStatus: "complement_required",
-        reasons: ["wrong_period"],
-        message: `O documento enviado é referente a ${YEAR - 1}. Envie o ComprovaBet anual de ${YEAR}, emitido no seu CPF.`,
+        reasons: ["illegible_file"],
+        message: `O PDF enviado é uma digitalização sem texto e algumas partes estão ilegíveis. Envie o ComprovaBet ${YEAR} em PDF, baixado diretamente do site de origem.`,
       },
     ],
   },
@@ -286,7 +290,6 @@ export const DEMO_CASES: DemoCase[] = [
     declared: { deposits: R(26000), withdrawals: R(4000), balance: 0 },
     comprovabet: { file: `comprovabet-${YEAR}-diego.pdf`, cpf: "full" },
     events: [
-      { kind: "approve" },
       { kind: "start" },
       {
         kind: "complement",
@@ -315,7 +318,7 @@ export const DEMO_CASES: DemoCase[] = [
     platforms: [{ slug: "plataforma-exemplo", name: "Plataforma Exemplo", custom: true }],
     declared: { deposits: R(1800), withdrawals: R(1500), balance: 0 },
     comprovabet: { file: `comprovabet-${YEAR}-eva.pdf`, cpf: "full" },
-    events: [{ kind: "approve" }, { kind: "start" }, { kind: "finish", to: "not_eligible", message: "Análise documental concluída." }],
+    events: [{ kind: "start" }, { kind: "finish", to: "not_eligible", message: "Análise documental concluída." }],
     payment: { method: "credit_card" },
     confirmIdentified: true,
   },
@@ -335,7 +338,6 @@ export const DEMO_CASES: DemoCase[] = [
     declared: { deposits: R(15000), withdrawals: R(3000), balance: 0 },
     comprovabet: { file: `comprovabet-${YEAR}-fabio.pdf`, cpf: "full" },
     events: [
-      { kind: "approve" },
       { kind: "start" },
       { kind: "finish", to: "eligible" },
       { kind: "finish", to: "completed", message: "Análise documental concluída." },
@@ -474,7 +476,7 @@ export async function seedDemoData(): Promise<SeededCase[]> {
         privacyConsentIp: "203.0.113.10",
         isDemo: true,
         createdAt,
-        reviewDeadline: new Date(createdAt.getTime() + config.reviewDays * DAY),
+        reviewDeadline: addBusinessDays(createdAt, config.reviewDays),
         platforms: { create: [...platformIds.values()].map((platformId) => ({ platformId })) },
         declarations: {
           create: {
@@ -554,7 +556,14 @@ export async function seedDemoData(): Promise<SeededCase[]> {
       });
     }
 
-    // ComprovaBet (PDF fictício): a conferência do CPF passa pela mesma leitura usada nos envios reais.
+    // Etapas do caso (mesmas regras das ações do painel e do cliente).
+    let status: CaseStatus = "documents_received";
+    const move = async (to: CaseStatus, at: Date, publicMessage: string | null = null, changedById: string | null = reviewerId) => {
+      await prisma.statusHistory.create({ data: { caseId: c.id, fromStatus: status, toStatus: to, changedById, publicMessage, createdAt: at } });
+      status = to;
+    };
+
+    // ComprovaBet (PDF fictício): a conferência do CPF e a pré-análise passam pela mesma leitura usada nos envios reais.
     let comprovabetId: string | null = null;
     if (demo.comprovabet && cpf) {
       const spec = demo.comprovabet;
@@ -565,15 +574,19 @@ export async function seedDemoData(): Promise<SeededCase[]> {
           : spec.cpf === "masked"
             ? `***.${cpf.slice(3, 6)}.${cpf.slice(6, 9)}-**`
             : "***.482.917-**";
-      const body = comprovabetPdf({
-        holder: spec.cpf === "other_person" ? "Marcos Exemplo Terceiro" : demo.name,
-        cpfText,
-        year,
-        platform: demo.platforms.map((p) => p.name).join(", "),
-        deposits: Math.round(deposits * 0.97),
-        withdrawals,
-        balance,
-      });
+      const pdfLines =
+        spec.cpf === "scanned"
+          ? []
+          : comprovabetLines({
+              holder: spec.cpf === "other_person" ? "Marcos Exemplo Terceiro" : demo.name,
+              cpfText,
+              year,
+              platform: demo.platforms.map((p) => p.name).join(", "),
+              deposits: Math.round(deposits * 0.97),
+              withdrawals,
+              balance,
+            });
+      const body = spec.cpf === "scanned" ? scannedPdf() : simplePdf(pdfLines);
       const check = await inspectComprovaBet({ buffer: body, kind: "pdf", cpf, referenceYear: YEAR });
       if (check.cpfCheck === "mismatch") throw new Error(`${demo.protocol}: o PDF de demonstração não deveria divergir na leitura.`);
       const storageKey = `documents/demo/${randomUUID()}.pdf`;
@@ -595,27 +608,51 @@ export async function seedDemoData(): Promise<SeededCase[]> {
         },
       });
       comprovabetId = doc.id;
+
+      // Pré-análise automática feita antes do pagamento: aprovada, o documento entra aprovado e o caso já fica
+      // pronto para a análise (como no envio real).
+      const preAnalysis: PreAnalysis = aggregatePreAnalysis(
+        [
+          evaluateComprovaBet({
+            documentId: doc.id,
+            name: spec.file,
+            kind: "pdf",
+            lines: pdfLines.map((l) => l.text),
+            cpf,
+            referenceYear: YEAR,
+            declaredPlatforms: demo.platforms.map((p) => p.name),
+            declaredDepositsCents: deposits,
+            declaredWithdrawalsCents: withdrawals,
+          }),
+        ],
+        YEAR,
+        new Date(createdAt.getTime() - 5 * 60_000),
+      );
+      await prisma.case.update({ where: { id: c.id }, data: { preAnalysis: preAnalysis as unknown as Prisma.InputJsonValue } });
+      if (preAnalysis.status === "approved") {
+        await prisma.document.update({
+          where: { id: doc.id },
+          data: { status: "valid", reviewedAt: new Date(createdAt.getTime() + 1000), reviewNote: AUTO_APPROVAL_NOTE },
+        });
+        await move("payment_confirmed", new Date(createdAt.getTime() + 2000), null, null);
+      }
     }
     for (const doc of demo.legacyDocs ?? []) await saveCsv(c.id, platformIds.get(doc.platform) ?? null, doc, createdAt);
 
-    // Etapas seguintes, espaçadas entre o envio e agora (mesmas regras das ações do painel e do cliente).
-    let status: CaseStatus = "documents_received";
+    // Etapas seguintes, espaçadas entre o envio e agora.
     const steps = demo.events.length + (demo.legacyFlow?.length ?? 0);
     const times = Array.from({ length: steps }, (_, i) => {
       const start = createdAt.getTime() + 2 * HOUR;
       const end = now - 10 * 60_000;
       return new Date(start + ((end - start) * (i + 1)) / (steps + 1));
     });
-    const move = async (to: CaseStatus, at: Date, publicMessage: string | null = null, changedById: string | null = reviewerId) => {
-      await prisma.statusHistory.create({ data: { caseId: c.id, fromStatus: status, toStatus: to, changedById, publicMessage, createdAt: at } });
-      status = to;
-    };
     for (const [i, event] of demo.events.entries()) {
       const at = times[i] ?? new Date(now - 60_000);
       switch (event.kind) {
         case "approve": {
           if (!comprovabetId) break;
-          const current = await prisma.document.findUniqueOrThrow({ where: { id: comprovabetId }, select: { cpfCheck: true } });
+          const current = await prisma.document.findUniqueOrThrow({ where: { id: comprovabetId }, select: { cpfCheck: true, status: true } });
+          if (current.status === "valid") break; // já aprovado na pré-análise automática
           const manual = current.cpfCheck !== "match";
           await prisma.document.update({
             where: { id: comprovabetId },

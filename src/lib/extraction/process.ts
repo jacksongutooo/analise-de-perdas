@@ -132,7 +132,10 @@ export async function processDocument(documentId: string): Promise<void> {
       }),
     ]);
   } catch (error) {
-    console.error("[extraction] falha ao ler documento", doc.id, error);
+    const message = error instanceof Error ? error.message : "erro desconhecido";
+    // PDF digitalizado (sem texto) é esperado: fica para a conferência manual, sem alarme de erro.
+    if (/sem texto selecion/i.test(message)) console.warn("[extraction] documento sem texto para leitura automática", doc.id);
+    else console.error("[extraction] falha ao ler documento", doc.id, message);
     await prisma.document.update({
       where: { id: doc.id },
       data: {

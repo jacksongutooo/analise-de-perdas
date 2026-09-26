@@ -6,7 +6,9 @@ import { PageShell } from "@/components/site";
 import { LinkButton } from "@/components/ui";
 import { getTrackingCaseId } from "@/lib/auth/tracking";
 import { prisma } from "@/lib/db";
+import { contactWithinText } from "@/lib/comprovabet";
 import { config } from "@/lib/env";
+import { formatDate } from "@/lib/format";
 
 export const metadata: Metadata = { title: "Solicitação recebida", robots: { index: false } };
 export const dynamic = "force-dynamic";
@@ -14,17 +16,25 @@ export const dynamic = "force-dynamic";
 export default async function RecebidaPage() {
   const caseId = await getTrackingCaseId();
   const c = caseId
-    ? await prisma.case.findUnique({ where: { id: caseId }, select: { protocol: true, isDemo: true, paymentStatus: true } })
+    ? await prisma.case.findUnique({
+        where: { id: caseId },
+        select: { protocol: true, isDemo: true, paymentStatus: true, status: true, reviewDeadline: true },
+      })
     : null;
   if (!c || c.isDemo !== config.demoMode) redirect("/acompanhar");
   const paid = c.paymentStatus === "confirmed";
-  const steps = paid
-    ? ["Validação do ComprovaBet pela equipe", `Análise do caso (prazo estimado de até ${config.reviewDays} dias)`]
-    : [
-        "Validação do ComprovaBet pela equipe",
-        "Pagamento da análise",
-        `Análise do caso (prazo estimado de até ${config.reviewDays} dias após o pagamento)`,
-      ];
+  // ComprovaBet aprovado na pré-análise automática: a validação documental já está concluída.
+  const autoApproved = paid && c.status === "payment_confirmed";
+  const contact = `Contato da equipe até ${formatDate(c.reviewDeadline)} (${config.reviewDays} dias úteis)`;
+  const steps = autoApproved
+    ? ["Análise do caso pela nossa equipe", contact]
+    : paid
+      ? ["Conferência do ComprovaBet pela equipe", "Análise do caso", contact]
+      : [
+          "Validação do ComprovaBet pela equipe",
+          "Pagamento da análise",
+          `Análise do caso (prazo estimado de até ${config.reviewDays} dias úteis após o pagamento)`,
+        ];
 
   return (
     <PageShell showTracking={false}>
@@ -34,7 +44,11 @@ export default async function RecebidaPage() {
         </span>
         <h1 className="mt-5 text-3xl font-semibold tracking-tight text-ink">Solicitação recebida</h1>
         <p className="mt-2 text-lg text-ink-soft">
-          {paid ? "Pagamento confirmado. Seu ComprovaBet foi enviado para a validação documental." : "Seu ComprovaBet foi enviado para a validação documental."}
+          {autoApproved
+            ? "Pagamento confirmado e ComprovaBet aprovado na pré-análise. Sua análise foi encaminhada para a nossa equipe."
+            : paid
+              ? "Pagamento confirmado. Seu ComprovaBet foi encaminhado para a conferência da nossa equipe."
+              : "Seu ComprovaBet foi enviado para a validação documental."}
         </p>
 
         <div className="mt-7 rounded-2xl border border-dashed border-line-strong bg-paper px-5 py-4">
@@ -54,6 +68,8 @@ export default async function RecebidaPage() {
             </li>
           ))}
         </ol>
+
+        {paid && <p className="mt-4 text-sm leading-relaxed text-ink-soft">{contactWithinText(config.reviewDays)}</p>}
 
         <LinkButton href="/acompanhar" size="lg" className="mt-8 w-full">
           Acompanhar análise

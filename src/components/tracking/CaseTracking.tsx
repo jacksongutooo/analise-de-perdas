@@ -3,6 +3,7 @@ import { trackingLogout } from "@/app/acompanhar/actions";
 import type { ClientCase } from "@/lib/cases/client-view";
 import {
   ANALYSIS_IN_PROGRESS_TEXT,
+  contactWithinText,
   COMPLEMENT_TEXT,
   COMPLEMENT_TITLE,
   CPF_MISMATCH_MESSAGE,
@@ -11,6 +12,7 @@ import {
   VALIDATION_PENDING_TEXT,
 } from "@/lib/comprovabet";
 import { cx } from "@/lib/cx";
+import { config } from "@/lib/env";
 import { formatBRL, formatDate } from "@/lib/format";
 import { DEFAULT_NEXT_STEPS, REQUEST_REASONS, labelFor } from "@/lib/options";
 import { CASE_STATUS_LABEL, CASE_STATUS_TONE, clientTimeline, type TimelineState } from "@/lib/status";
@@ -119,12 +121,14 @@ function StageBlock({ data }: { data: ClientCase }) {
         <Card tone="ok" title={data.hasComprovaBet ? DOCUMENT_APPROVED_TITLE : "Documentação validada"}>
           {data.hasComprovaBet && <p>{DOCUMENT_APPROVED_TEXT}</p>}
           <p>A análise será iniciada pela nossa equipe. Você acompanha todas as etapas por este painel.</p>
+          {data.paymentStatus === "confirmed" && <p className="text-sm text-ink-soft">{contactWithinText(config.reviewDays)}</p>}
         </Card>
       );
     case "under_review":
       return (
         <Card tone="info" title="Análise em andamento">
           <p>{ANALYSIS_IN_PROGRESS_TEXT}</p>
+          {data.paymentStatus === "confirmed" && <p className="text-sm text-ink-soft">{contactWithinText(config.reviewDays)}</p>}
         </Card>
       );
     case "eligible":
@@ -267,7 +271,8 @@ export function CaseTracking({ data }: { data: ClientCase }) {
           />
           {showDeadline && (
             <LedgerRow
-              label="Prazo estimado"
+              label="Prazo para retorno"
+              hint={data.paymentStatus === "confirmed" ? `${config.reviewDays} dias úteis` : undefined}
               value={
                 <span className="inline-flex items-center gap-1.5">
                   <IconClock size={16} className="text-muted" />

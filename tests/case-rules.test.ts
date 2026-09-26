@@ -15,6 +15,7 @@ import {
   firstInvalidScreen,
   loadProgress,
   resumeScreen,
+  sameDocuments,
   saveProgress,
   screenError,
   selectedPlatformNames,
@@ -83,24 +84,43 @@ describe("formulário", () => {
     assert.equal(screenError("situation", { ...filled, controlLoss: "no" }, { fileCount: 1, busy: false }), "Escolha ao menos uma opção.");
   });
 
-  test("os dados do solicitante (com CPF) vêm antes do envio do ComprovaBet", () => {
+  test("os dados do solicitante (com CPF) vêm antes do envio do ComprovaBet; a revisão vem antes do documento", () => {
     const order = SCREENS.map((s) => s.id);
     assert.ok(order.indexOf("contact") < order.indexOf("documents"));
-    assert.equal(order.at(-2), "review");
+    assert.ok(order.indexOf("commitment") < order.indexOf("review"));
+    assert.ok(order.indexOf("review") < order.indexOf("documents"));
+  });
+
+  test("pré-análise: logo depois do envio do ComprovaBet e antes do pagamento", () => {
+    const order = SCREENS.map((s) => s.id);
+    assert.equal(order.indexOf("documents") + 1, order.indexOf("analysis"));
+    assert.equal(order.indexOf("analysis") + 1, order.indexOf("payment"));
+    const ctx = { fileCount: 1, busy: false };
+    assert.equal(screenError("analysis", filled, ctx), "Aguarde a pré-análise do seu ComprovaBet.");
+    assert.equal(screenError("analysis", filled, { ...ctx, analysis: { status: "approved", message: "" } }), null);
+    assert.equal(screenError("analysis", filled, { ...ctx, analysis: { status: "review", message: "" } }), null);
+    assert.equal(screenError("analysis", filled, { ...ctx, analysis: { status: "blocked", message: "Envie o ComprovaBet 2025." } }), "Envie o ComprovaBet 2025.");
+    // Sem pré-análise concluída, o pagamento não abre.
+    assert.equal(firstInvalidScreen(filled, ctx), "analysis");
+    // Retomar na pré-análise volta para o envio do documento (a conferência é refeita).
+    assert.equal(resumeScreen("analysis", { ...filled, cpf: "", cpfMasked: "***.***.***-25" }), "documents");
+    assert.equal(FIELD_SCREEN.analysis, "analysis");
+    assert.ok(sameDocuments(["a", "b"], ["b", "a"]));
+    assert.ok(!sameDocuments(["a"], ["a", "b"]));
   });
 
   test("pagamento: última tela, depois da revisão; Solicitar análise só com o pagamento aprovado", () => {
     const order = SCREENS.map((s) => s.id);
     assert.equal(order.at(-1), "payment");
-    assert.equal(order.indexOf("review") + 1, order.indexOf("payment"));
-    const ctx = { fileCount: 1, busy: false };
+    assert.ok(order.indexOf("review") < order.indexOf("payment"));
+    const ctx = { fileCount: 1, busy: false, analysis: { status: "approved" as const, message: "" } };
     assert.equal(screenError("payment", { ...filled, termsAccepted: false }, ctx), TERMS_REQUIRED_MESSAGE);
     assert.equal(screenError("payment", { ...filled, termsAccepted: true }, ctx), PAYMENT_REQUIRED_MESSAGE);
     assert.equal(screenError("payment", { ...filled, termsAccepted: true }, { ...ctx, paid: true }), null);
     // Antes de abrir o pagamento, todas as respostas precisam estar completas.
     assert.equal(firstInvalidScreen(filled, ctx), null);
     assert.equal(firstInvalidScreen({ ...filled, controlLoss: null }, ctx), "control");
-    assert.equal(firstInvalidScreen(filled, { fileCount: 0, busy: false }), "documents");
+    assert.equal(firstInvalidScreen(filled, { ...ctx, fileCount: 0 }), "documents");
     // Erros do servidor sobre o aceite e o pagamento levam à tela de pagamento.
     assert.equal(FIELD_SCREEN.accept, "payment");
     assert.equal(FIELD_SCREEN.payment, "payment");

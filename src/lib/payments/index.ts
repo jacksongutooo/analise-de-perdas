@@ -10,6 +10,8 @@ import { SERVICE_TERMS_VERSION } from "@/lib/comprovabet";
 import { prisma } from "@/lib/db";
 import { config } from "@/lib/env";
 import { processCaseDocuments } from "@/lib/extraction/process";
+import { parsePreAnalysis, type PreAnalysisStatus } from "@/lib/documents/pre-analysis";
+import { runPreAnalysis } from "@/lib/documents/pre-analysis-run";
 import { centsToDecimal, decimalToCents } from "@/lib/format";
 import { site } from "@/lib/site";
 import { demoProvider } from "./demo";
@@ -63,6 +65,10 @@ export async function startPayment(params: {
   await assertDraftReady(params.draftId);
 
   if (await prisma.payment.count({ where: { draftId: params.draftId, status: "approved" } })) return { alreadyPaid: true };
+
+  // A pré-análise automática é refeita aqui (os arquivos podem ter mudado): documento de outro ano ou CPF impede o pagamento.
+  const pre = await runPreAnalysis(params.draftId, params.data);
+  if (pre.status === "blocked") throw new SubmissionError(pre.message, "analysis");
 
   const now = new Date();
   const draft = await prisma.caseDraft.findUniqueOrThrow({ where: { id: params.draftId }, select: { expiresAt: true } });
@@ -247,12 +253,14 @@ export type DraftPaymentView = {
   checkoutUrl: string | null;
   termsAcceptedAt: string | null;
   protocol: string | null;
+  /** Resultado da última pré-análise automática do ComprovaBet. */
+  preAnalysis: PreAnalysisStatus | null;
 };
 
 /** Situação do pagamento do rascunho para a tela de pagamento (sincroniza com o gateway se preciso). */
 export async function draftPaymentView(draftId: string): Promise<DraftPaymentView> {
   const payment = await syncDraftPayments(draftId);
-  const draft = await prisma.caseDraft.findUnique({ where: { id: draftId }, select: { termsAcceptedAt: true, caseId: true } });
+  const draft = await prisma.caseDraft.findUnique({ where: { id: draftId }, select: { termsAcceptedAt: true, caseId: true, preAnalysis: true } });
   const c = draft?.caseId ? await prisma.case.findUnique({ where: { id: draft.caseId }, select: { protocol: true } }) : null;
   return {
     status: payment ? payment.status : "none",
@@ -261,5 +269,6 @@ export async function draftPaymentView(draftId: string): Promise<DraftPaymentVie
     checkoutUrl: payment?.status === "pending" ? payment.checkoutUrl : null,
     termsAcceptedAt: draft?.termsAcceptedAt?.toISOString() ?? null,
     protocol: c?.protocol ?? null,
+    preAnalysis: parsePreAnalysis(draft?.preAnalysis)?.status ?? null,
   };
 }

@@ -211,9 +211,9 @@ export const COMPROVABET_REASON_VALUES: RequestReasonValue[] = [
   "other",
 ];
 
-export const COMMITMENT_VERSION = "2026-09-v1";
+export const COMMITMENT_VERSION = "2026-09-v2";
 export function commitmentText(reviewDays: number): string {
-  return `Declaro que, por decisão voluntária, permanecerei sem realizar novas apostas durante o período de análise do meu caso, que poderá durar até ${reviewDays} dias.`;
+  return `Declaro que, por decisão voluntária, permanecerei sem realizar novas apostas durante o período de análise do meu caso, que poderá durar até ${reviewDays} dias úteis.`;
 }
 
 export const PRIVACY_CONSENT_TEXT =

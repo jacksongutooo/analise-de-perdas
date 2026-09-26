@@ -51,6 +51,11 @@ export const SERVICE_TERMS_CHECKBOX =
   "Li e estou de acordo com as condições do serviço de análise e confirmo que as informações e documentos enviados são verdadeiros e pertencem ao solicitante cadastrado.";
 
 /** Versão das condições aceitas antes do pagamento. Mude ao alterar o texto acima ou os Termos de Uso. */
-export const SERVICE_TERMS_VERSION = "2026-09-v2";
+export const SERVICE_TERMS_VERSION = "2026-09-v3";
+
+/** Prazo de retorno da equipe depois do pagamento (em dias úteis). */
+export function contactWithinText(reviewDays: number): string {
+  return `Em até ${reviewDays} dias úteis, nossa equipe entra em contato pelo WhatsApp ou e-mail informados para apresentar o resultado da análise e, se o caso puder prosseguir, combinar as condições e as formas de pagamento das próximas etapas.`;
+}
 
 export const TRUST_LINE = "Processo estruturado com transparência, documentação e acompanhamento em todas as etapas.";

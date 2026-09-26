@@ -6,6 +6,7 @@ import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { logAccess } from "@/lib/audit";
 import { requireAdmin } from "@/lib/auth/admin";
+import { addBusinessDays } from "@/lib/business-days";
 import { demoScope } from "@/lib/cases/admin-queries";
 import { CPF_MISMATCH_MESSAGE } from "@/lib/comprovabet";
 import { formatCpf, normalizeCpf } from "@/lib/cpf";
@@ -437,7 +438,7 @@ export async function confirmPayment(caseId: string, formData: FormData) {
         paymentConfirmedAt: now,
         paymentConfirmedById: admin.id,
         paymentReference: reference,
-        reviewDeadline: new Date(now.getTime() + config.reviewDays * 86_400_000),
+        reviewDeadline: addBusinessDays(now, config.reviewDays),
       },
     }),
     ...transition(caseId, c.status, "payment_confirmed", admin.id),

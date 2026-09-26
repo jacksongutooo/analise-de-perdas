@@ -13,6 +13,7 @@ import { requireAdmin } from "@/lib/auth/admin";
 import { demoScope } from "@/lib/cases/admin-queries";
 import { CPF_MISMATCH_MESSAGE, SERVICE_TERMS_VERSION } from "@/lib/comprovabet";
 import { maskCpf } from "@/lib/cpf";
+import { PRE_ANALYSIS_STATUS_LABEL, PRE_CHECK_LABEL, parsePreAnalysis } from "@/lib/documents/pre-analysis";
 import { cx } from "@/lib/cx";
 import { prisma } from "@/lib/db";
 import { config } from "@/lib/env";
@@ -377,6 +378,7 @@ export default async function CasePage({
   const cpfLocked = CPF_LOCKED_STATUSES.includes(status) || comprovabetDocs.some((d) => d.status === "valid");
   const agreement = c.agreements[0] ?? null;
   const approvedPayment = c.payments.find((p) => p.status === "approved") ?? null;
+  const preAnalysis = parsePreAnalysis(c.preAnalysis);
   const canStart = status === "payment_confirmed" || (legacy && (status === "submitted" || status === "documents_received"));
   const latestNote = c.notes[0] ?? null;
 
@@ -483,6 +485,20 @@ export default async function CasePage({
               "—"
             )}
           </Info>
+          {preAnalysis && (
+            <Info label="Pré-análise automática">
+              <Badge tone={preAnalysis.status === "approved" ? "ok" : preAnalysis.status === "blocked" ? "warn" : "info"}>
+                {PRE_ANALYSIS_STATUS_LABEL[preAnalysis.status]}
+              </Badge>
+              {preAnalysis.checks
+                .filter((check) => check.state !== "ok")
+                .map((check) => (
+                  <span key={check.key} className="mt-1 block text-xs text-muted">
+                    {PRE_CHECK_LABEL[check.key]}: {check.detail}
+                  </span>
+                ))}
+            </Info>
+          )}
           <Info label="Status da análise">
             <Badge tone={CASE_STATUS_TONE[status]}>{CASE_STATUS_LABEL[status]}</Badge>
           </Info>
@@ -558,7 +574,7 @@ export default async function CasePage({
               action={confirmPayment.bind(null, c.id)}
               description={
                 <p>
-                  Confirme só depois de verificar o recebimento. O prazo estimado da análise (até {config.reviewDays} dias) passa a contar agora.
+                  Confirme só depois de verificar o recebimento. O prazo estimado da análise (até {config.reviewDays} dias úteis) passa a contar agora.
                 </p>
               }
             >
@@ -874,6 +890,9 @@ export default async function CasePage({
                     <p className="mt-1 text-xs text-muted">
                       Conferido por {doc.reviewedBy.name} em {formatDateTime(doc.reviewedAt)}
                     </p>
+                  )}
+                  {!doc.reviewedBy && doc.reviewedAt && doc.status === "valid" && (
+                    <p className="mt-1 text-xs text-muted">Aprovado automaticamente na pré-análise em {formatDateTime(doc.reviewedAt)}</p>
                   )}
 
                   <div className="mt-3 rounded-lg bg-paper px-3 py-2.5 text-sm">

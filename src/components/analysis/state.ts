@@ -1,6 +1,7 @@
 // Estado do formulário em etapas: telas, validação por etapa, cálculo e salvamento automático.
 import { isValidCpf } from "@/lib/cpf";
 import { isValidEmail, normalizePhoneBR } from "@/lib/format";
+import type { PreAnalysisStatus } from "@/lib/documents/pre-analysis";
 import { PLATFORMS, situationValuesFor, type BetTypeValue, type ControlLossValue, type PeriodValue, type SituationValue } from "@/lib/options";
 
 export type Screen =
@@ -13,6 +14,7 @@ export type Screen =
   | "control"
   | "situation"
   | "documents"
+  | "analysis"
   | "commitment"
   | "contact"
   | "review"
@@ -23,6 +25,8 @@ export const TOTAL_STEPS = 7;
 /**
  * Cada etapa numerada tem no máximo 1 ou 2 perguntas; algumas ocupam duas telas curtas.
  * Os dados do solicitante (com o CPF) vêm antes do ComprovaBet: o documento é conferido com esse CPF.
+ * Depois da revisão das respostas, o cliente envia o ComprovaBet, que passa pela pré-análise automática;
+ * com ela concluída, segue direto para o pagamento. Só com o pagamento aprovado o botão "Solicitar análise" aparece.
  */
 export const SCREENS: { id: Screen; step: number | null; label?: string }[] = [
   { id: "type", step: 1 },
@@ -34,10 +38,10 @@ export const SCREENS: { id: Screen; step: number | null; label?: string }[] = [
   { id: "control", step: 5 },
   { id: "situation", step: 5 },
   { id: "contact", step: 6 },
-  { id: "documents", step: 7 },
-  { id: "commitment", step: null, label: "Último passo" },
+  { id: "commitment", step: null, label: "Compromisso" },
   { id: "review", step: null, label: "Revisão" },
-  // A análise é paga antes da solicitação: só com o pagamento aprovado o botão "Solicitar análise" é liberado.
+  { id: "documents", step: 7 },
+  { id: "analysis", step: null, label: "Pré-análise" },
   { id: "payment", step: null, label: "Pagamento" },
 ];
 
@@ -118,6 +122,8 @@ export type PaymentState = {
   checkoutUrl: string | null;
   termsAcceptedAt: string | null;
   protocol: string | null;
+  /** Resultado da última pré-análise automática gravada no servidor. */
+  preAnalysis: PreAnalysisStatus | null;
 };
 
 export const TERMS_REQUIRED_MESSAGE = "Para continuar, marque a declaração de aceite.";
@@ -180,7 +186,15 @@ export function contactErrors(d: WizardData): ContactErrors {
   return errors;
 }
 
-export type ScreenContext = { fileCount: number; busy: boolean; paid?: boolean };
+export type ScreenContext = {
+  fileCount: number;
+  busy: boolean;
+  paid?: boolean;
+  /** Resultado conhecido da pré-análise automática (e a mensagem, quando há pendência). */
+  analysis?: { status: PreAnalysisStatus; message: string } | null;
+};
+
+export const ANALYSIS_REQUIRED_MESSAGE = "Aguarde a pré-análise do seu ComprovaBet.";
 
 export function screenError(screen: Screen, d: WizardData, ctx: ScreenContext): string | null {
   switch (screen) {
@@ -219,15 +233,25 @@ export function screenError(screen: Screen, d: WizardData, ctx: ScreenContext): 
       return Object.values(contactErrors(d))[0] ?? null;
     case "review":
       return null;
+    case "analysis":
+      if (!ctx.analysis) return ANALYSIS_REQUIRED_MESSAGE;
+      return ctx.analysis.status === "blocked" ? ctx.analysis.message : null;
     case "payment":
       if (ctx.paid) return null;
       return d.termsAccepted ? PAYMENT_REQUIRED_MESSAGE : TERMS_REQUIRED_MESSAGE;
   }
 }
 
-/** Primeira tela com resposta pendente (a revisão e o pagamento não têm respostas próprias). */
+/** Primeira tela com resposta pendente antes do pagamento (a revisão e o pagamento não têm respostas próprias). */
 export function firstInvalidScreen(d: WizardData, ctx: ScreenContext): Screen | null {
   return SCREENS.find((s) => s.id !== "review" && s.id !== "payment" && screenError(s.id, d, ctx))?.id ?? null;
+}
+
+/** Arquivos analisados continuam os mesmos? (a pré-análise é refeita quando o ComprovaBet muda) */
+export function sameDocuments(analyzed: readonly string[], current: readonly string[]): boolean {
+  if (analyzed.length !== current.length) return false;
+  const set = new Set(analyzed);
+  return current.every((id) => set.has(id));
 }
 
 /** Liga o campo apontado pelo servidor à tela onde ele é corrigido. */
@@ -256,6 +280,7 @@ export const FIELD_SCREEN: Record<string, Screen> = {
   isAdult: "contact",
   accept: "payment",
   payment: "payment",
+  analysis: "analysis",
 };
 
 export function buildPayload(d: WizardData) {
@@ -324,10 +349,13 @@ export function clearProgress(): void {
 
 /** Ao retomar, volta para a primeira etapa incompleta anterior à tela salva. */
 export function resumeScreen(saved: Screen, d: WizardData): Screen {
-  const savedIndex = SCREENS.findIndex((s) => s.id === saved);
+  // A pré-análise é refeita ao abrir: retomar nela é o mesmo que voltar ao envio do documento.
+  const target: Screen = saved === "analysis" ? "documents" : saved;
+  const savedIndex = SCREENS.findIndex((s) => s.id === target);
   for (let i = 0; i < savedIndex; i++) {
     const s = SCREENS[i];
-    if (s && s.id !== "documents" && screenError(s.id, d, { fileCount: 1, busy: false })) return s.id;
+    // Documento e pré-análise dependem do servidor: são conferidos nas próprias telas.
+    if (s && s.id !== "documents" && s.id !== "analysis" && screenError(s.id, d, { fileCount: 1, busy: false })) return s.id;
   }
-  return saved;
+  return target;
 }

@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import type { PreAnalysis } from "@/lib/documents/pre-analysis";
 import type { BetTypeValue } from "@/lib/options";
 import { IconCheck, IconX } from "../icons";
 import { Logo } from "../site";
@@ -21,6 +22,7 @@ import {
   firstInvalidScreen,
   loadProgress,
   resumeScreen,
+  sameDocuments,
   saveProgress,
   screenError,
   selectedPlatformNames,
@@ -32,6 +34,7 @@ import {
 } from "./state";
 import {
   AmountsStep,
+  AnalysisStep,
   BalanceStep,
   CommitmentStep,
   ContactStep,
@@ -76,6 +79,12 @@ export function AnalysisWizard({ settings, returning = false }: { settings: Wiza
   const [paymentChecking, setPaymentChecking] = useState(false);
   const [paying, setPaying] = useState(false);
   const [lostProgress, setLostProgress] = useState(false);
+  // Pré-análise automática do ComprovaBet (tela logo depois do envio do documento).
+  const [analysisResult, setAnalysisResult] = useState<PreAnalysis | null>(null);
+  const [analysisError, setAnalysisError] = useState<string | null>(null);
+  const [analysisRunning, setAnalysisRunning] = useState(false);
+  const [analysisAnimate, setAnalysisAnimate] = useState(true);
+  const [analysisSettled, setAnalysisSettled] = useState(false);
 
   const draftRef = useRef<DraftCreds | null>(null);
   const restoredDraftId = useRef<string | null>(null);
@@ -291,7 +300,15 @@ export function AnalysisWizard({ settings, returning = false }: { settings: Wiza
   const meta = SCREENS[index] ?? SCREENS[0]!;
   const platformNames = useMemo(() => selectedPlatformNames(data), [data]);
   const sentComprovaBet = useMemo(() => comprovabetFiles(files), [files]);
+  const comprovabetIds = useMemo(() => sentComprovaBet.map((f) => f.id), [sentComprovaBet]);
   const year = settings.comprovabetYear;
+  // Resultado da pré-análise que vale para os arquivos atuais (ou o gravado no servidor, na volta do checkout).
+  const freshAnalysis = analysisResult && sameDocuments(analysisResult.documentIds, comprovabetIds) ? analysisResult : null;
+  const analysisCtx = freshAnalysis
+    ? { status: freshAnalysis.status, message: freshAnalysis.message }
+    : payment?.preAnalysis
+      ? { status: payment.preAnalysis, message: "Refaça a pré-análise do seu ComprovaBet." }
+      : null;
   const progress = Math.round(((index + 1) / SCREENS.length) * 100);
 
   const goTo = useCallback((target: Screen) => {
@@ -312,6 +329,22 @@ export function AnalysisWizard({ settings, returning = false }: { settings: Wiza
   useEffect(() => {
     if (paid && screen !== "payment") goTo("payment");
   }, [paid, screen, goTo]);
+
+  // Ao abrir a tela da pré-análise: refaz a conferência (ou mostra o resultado já obtido para os mesmos arquivos).
+  const runAnalysisRef = useRef<() => void>(() => undefined);
+  runAnalysisRef.current = () => void runAnalysis();
+  const freshAnalysisRef = useRef(freshAnalysis);
+  freshAnalysisRef.current = freshAnalysis;
+  useEffect(() => {
+    if (!ready || screen !== "analysis") return;
+    if (freshAnalysisRef.current) {
+      setAnalysisAnimate(false);
+      setAnalysisError(null);
+      return;
+    }
+    runAnalysisRef.current();
+  }, [ready, screen]);
+  const onAnalysisSettled = useCallback(() => setAnalysisSettled(true), []);
 
   const update = useCallback((patch: Partial<WizardData>) => {
     setData((current) => ({ ...current, ...patch }));
@@ -335,7 +368,7 @@ export function AnalysisWizard({ settings, returning = false }: { settings: Wiza
 
   /** Leva à tela com a resposta pendente (ou ao envio do documento, sem rascunho). Devolve false se algo falta. */
   function answersComplete(): DraftCreds | null {
-    const ctx = { fileCount: sentComprovaBet.length, busy };
+    const ctx = { fileCount: sentComprovaBet.length, busy, analysis: analysisCtx };
     const invalid = firstInvalidScreen(data, ctx);
     if (invalid) {
       goTo(invalid);
@@ -371,6 +404,42 @@ export function AnalysisWizard({ settings, returning = false }: { settings: Wiza
       }
     }
     setError(message);
+  }
+
+  /** Pré-análise automática: o servidor lê o ComprovaBet e confere com as respostas do formulário. */
+  async function runAnalysis() {
+    const creds = draftRef.current;
+    if (!creds) {
+      goTo("documents");
+      setError("Envie o seu ComprovaBet para continuar.");
+      return;
+    }
+    setAnalysisResult(null);
+    setAnalysisError(null);
+    setAnalysisSettled(false);
+    setAnalysisAnimate(true);
+    setAnalysisRunning(true);
+    try {
+      const res = await fetch("/api/draft/analysis", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...draftHeaders(creds) },
+        body: JSON.stringify({ answers: buildPayload(data) }),
+      });
+      const body = (await res.json().catch(() => ({}))) as { analysis?: PreAnalysis; error?: string; field?: string };
+      if (res.ok && body.analysis) {
+        setAnalysisResult(body.analysis);
+        return;
+      }
+      if (res.status === 401 || res.status === 410 || (res.status === 422 && body.field)) {
+        showServerError(res.status, body, "Não foi possível fazer a pré-análise agora. Tente novamente.");
+        return;
+      }
+      setAnalysisError(body.error ?? "Não foi possível fazer a pré-análise agora. Tente novamente.");
+    } catch {
+      setAnalysisError("Sem conexão. Verifique sua internet e tente novamente.");
+    } finally {
+      setAnalysisRunning(false);
+    }
   }
 
   /** Abre o pagamento: grava o aceite e as respostas no servidor e segue para o checkout. */
@@ -484,13 +553,22 @@ export function AnalysisWizard({ settings, returning = false }: { settings: Wiza
 
   function next() {
     if (savingCpf || paying || submitting) return;
-    if (filesLoading && (screen === "documents" || screen === "review")) return;
+    if (filesLoading && screen === "documents") return;
     if (screen === "payment") {
       if (paid) void submit();
       else void pay();
       return;
     }
-    if (screen === "review") {
+    if (screen === "analysis") {
+      if (analysisRunning || (freshAnalysis && !analysisSettled)) return;
+      if (analysisError || !freshAnalysis) {
+        void runAnalysis();
+        return;
+      }
+      if (freshAnalysis.status === "blocked") {
+        goTo("documents");
+        return;
+      }
       if (answersComplete()) goTo("payment");
       return;
     }
@@ -541,6 +619,7 @@ export function AnalysisWizard({ settings, returning = false }: { settings: Wiza
     }
     clearProgress();
     setPayment(null);
+    setAnalysisResult(null);
     setData(EMPTY_DATA);
     setDraft(null);
     setFiles([]);
@@ -595,9 +674,19 @@ export function AnalysisWizard({ settings, returning = false }: { settings: Wiza
             data={data}
             headingRef={headingRef}
             platformNames={platformNames}
-            fileCount={filesLoading ? null : sentComprovaBet.length}
             year={year}
             goTo={goTo}
+          />
+        );
+      case "analysis":
+        return (
+          <AnalysisStep
+            headingRef={headingRef}
+            year={year}
+            result={freshAnalysis}
+            error={analysisError}
+            animate={analysisAnimate}
+            onSettled={onAnalysisSettled}
           />
         );
       case "payment":
@@ -609,14 +698,23 @@ export function AnalysisWizard({ settings, returning = false }: { settings: Wiza
             checking={paymentChecking}
             showErrors={attempted}
             onCheck={() => void refreshPayment()}
+            analysis={analysisCtx?.status ?? null}
+            reviewDays={settings.reviewDays}
           />
         );
     }
   }
 
+  const analysisBusy = screen === "analysis" && (analysisRunning || Boolean(freshAnalysis && !analysisSettled));
   const primaryLabel =
-    screen === "review"
-      ? "Ir para o pagamento"
+    screen === "analysis"
+      ? analysisBusy
+        ? "Analisando…"
+        : analysisError || !freshAnalysis
+          ? "Tentar novamente"
+          : freshAnalysis.status === "blocked"
+            ? "Enviar outro documento"
+            : "Ir para o pagamento"
       : screen === "payment"
         ? paid
           ? "Solicitar análise"
@@ -703,7 +801,7 @@ export function AnalysisWizard({ settings, returning = false }: { settings: Wiza
       <div className="fixed inset-x-0 bottom-0 z-20 border-t border-line bg-surface/95 pb-[env(safe-area-inset-bottom)] backdrop-blur-md">
         <div className="mx-auto flex max-w-xl gap-3 px-5 py-3">
           {!(onPaymentScreen && paid) && (
-            <Button variant="secondary" onClick={back} className="w-[7.5rem] shrink-0" disabled={!ready || submitting || savingCpf || paying}>
+            <Button variant="secondary" onClick={back} className="w-[7.5rem] shrink-0" disabled={!ready || submitting || savingCpf || paying || analysisRunning}>
               Voltar
             </Button>
           )}
@@ -715,7 +813,8 @@ export function AnalysisWizard({ settings, returning = false }: { settings: Wiza
               submitting ||
               savingCpf ||
               paying ||
-              (filesLoading && (screen === "documents" || screen === "review")) ||
+              analysisBusy ||
+              (filesLoading && screen === "documents") ||
               (onPaymentScreen && !paymentLoaded)
             }
           >

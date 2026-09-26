@@ -3,8 +3,9 @@
 Site responsivo (mobile first) para receber, organizar e analisar solicitações de pessoas que tiveram
 perdas em apostas esportivas ou cassino online. O documento principal da análise é o **ComprovaBet anual
 de 2025**, em nome do próprio solicitante: o cliente responde um formulário curto, informa o CPF, envia o
-ComprovaBet, revisa as respostas, paga a análise (Pix ou cartão, pelo Mercado Pago), solicita a análise e
-acompanha o caso por protocolo. A equipe
+ComprovaBet (que passa por uma pré-análise automática na hora), paga a análise (Pix ou cartão, pelo Mercado
+Pago), solicita a análise e acompanha o caso por protocolo. Em até 15 dias úteis a equipe entra em contato com o
+resultado. A equipe
 trabalha em um painel administrativo com conferência do CPF, ações rápidas com confirmação, leitura
 automática dos documentos, conferência de valores e solicitação de documentos complementares.
 
@@ -71,17 +72,18 @@ npm run dev
 
 O seed cria 11 casos fictícios (protocolos `DEMO-100001` a `DEMO-100011`), um para cada etapa do fluxo.
 Os ComprovaBets são PDFs gerados na hora, marcados como **DOCUMENTO FICTÍCIO**, com CPFs fictícios
-(`000.000.0XX-XX`), e passam pela mesma leitura de CPF dos envios reais. Todos (menos o caso anterior ao
-ComprovaBet) já chegam com a análise paga, como no fluxo atual, com transações do pagamento de demonstração:
+(`000.000.0XX-XX`), e passam pela mesma leitura de CPF e pela mesma pré-análise dos envios reais. Todos (menos o
+caso anterior ao ComprovaBet) já chegam com a análise paga, como no fluxo atual, com transações do pagamento de
+demonstração:
 
 | Protocolo | Situação |
 |---|---|
-| `DEMO-100001` | Validação documental — CPF compatível (leitura automática) |
-| `DEMO-100007` | Validação documental — CPF mascarado no documento: aguardando conferência documental |
+| `DEMO-100001` | Aprovado na pré-análise automática — aguardando início da análise |
+| `DEMO-100002` | Aprovado na pré-análise — aguardando início da análise (cartão recusado antes do Pix aprovado) |
+| `DEMO-100007` | Conferência pela equipe — CPF mascarado no documento (pré-análise sem aprovação automática) |
+| `DEMO-100010` | CPF mascarado, aprovado manualmente pela equipe — aguardando início da análise |
 | `DEMO-100008` | CPF divergente marcado pela equipe — documento em nome de outra pessoa |
-| `DEMO-100003` | Complemento solicitado — ComprovaBet de outro ano (período incorreto) |
-| `DEMO-100002` | Documento aprovado — aguardando início da análise (cartão recusado antes do Pix aprovado) |
-| `DEMO-100010` | Documento aprovado — aguardando início da análise |
+| `DEMO-100003` | Complemento solicitado — PDF digitalizado, sem texto e ilegível |
 | `DEMO-100009` | Análise em andamento (pago com cartão) |
 | `DEMO-100004` | Análise em andamento, com complemento enviado durante a análise |
 | `DEMO-100005` / `DEMO-100006` | Análise concluída (elementos insuficientes / concluída com valor validado) |
@@ -120,16 +122,17 @@ Fotos maiores são reduzidas no próprio navegador antes do envio. Em servidor p
 
 ## Fluxo do cliente
 
-Formulário (com o CPF e o ComprovaBet) → revisão → **pagamento da análise** → Solicitar análise →
-validação documental pela equipe → análise → acompanhamento pelo painel.
+Formulário (com o CPF) → compromisso → revisão das respostas → envio do ComprovaBet → **pré-análise automática**
+(barra de progresso com as conferências) → **pagamento da análise** → Solicitar análise → análise pela equipe →
+contato em até 15 dias úteis → acompanhamento pelo painel.
 
 - `/` — página inicial curta, com o que ter em mãos (CPF, ComprovaBet, e-mail e WhatsApp).
 - `/analise` — formulário em etapas curtas, com barra de progresso, “Voltar”, salvamento automático no navegador
   (“✓ Informações salvas”) e retomada de onde parou. A etapa 6 traz os dados do solicitante com o **CPF**
-  (máscara `000.000.000-00` e dígitos verificadores); a etapa 7 é o envio do **ComprovaBet**; depois vêm o
-  compromisso voluntário, a revisão “Confira sua solicitação” e o **Pagamento da análise**: valor, aviso
-  “Importante”, aceite obrigatório e o botão “Pagar a análise” (Pix ou cartão). O botão **Solicitar análise** só aparece
-  com o pagamento aprovado.
+  (máscara `000.000.000-00` e dígitos verificadores); depois vêm o compromisso voluntário e a revisão
+  “Confira sua solicitação”. A etapa 7 é o envio do **ComprovaBet**, seguido da **Pré-análise** (barra de progresso
+  com as conferências, uma a uma) e do **Pagamento da análise**: valor, aviso “Importante”, aceite obrigatório e o
+  botão “Pagar a análise” (Pix ou cartão). O botão **Solicitar análise** só aparece com o pagamento aprovado.
 - `/analise/recebida` — protocolo `ANL-XXXXXX` e próximos passos.
 - `/acompanhar` — acesso com protocolo + e-mail: etapa atual, linha do tempo em 6 etapas (Cadastro realizado ·
   ComprovaBet enviado · Pagamento confirmado · Validação documental · Análise em andamento · Análise concluída),
@@ -155,8 +158,36 @@ validação documental pela equipe → análise → acompanhamento pelo painel.
   - imagem, PDF digitalizado, PDF protegido, CPF mascarado ou ausente → **Aguardando conferência documental**
     (a equipe confere manualmente). O sistema nunca informa uma validação automática que não aconteceu.
 - A leitura também anota os anos citados no documento, para a equipe conferir o período.
-- **Nenhum documento é aprovado só por ter sido enviado**: a aprovação é sempre da equipe, e um ComprovaBet com
-  CPF divergente não pode ser aprovado.
+- **Nenhum documento é aprovado só por ter sido enviado**: ou ele passa na pré-análise automática (abaixo), ou a
+  equipe aprova. Um ComprovaBet com CPF divergente nunca é aprovado.
+
+## Pré-análise automática do ComprovaBet
+
+Logo depois do envio, a tela **Pré-análise** mostra uma barra de progresso enquanto o servidor confere o documento
+com as respostas do formulário (`src/lib/documents/pre-analysis-check.ts`, rota `POST /api/draft/analysis`). Cada
+linha mostra o resultado real da conferência:
+
+| Conferência | Aprova quando | Se não confirmar |
+|---|---|---|
+| Leitura do documento | PDF com texto selecionável | foto ou PDF digitalizado → equipe confere |
+| CPF do titular | o CPF informado aparece no texto | mascarado/ausente → equipe; outro CPF → pendência |
+| Ano de referência | o ano do `COMPROVABET_YEAR` aparece no texto | só outros anos → **pendência**; sem ano → equipe |
+| Tipo de documento | “ComprovaBet” ou demonstrativo de depósitos e saques/apostas | equipe confere |
+| Plataformas informadas | informativo: plataformas do formulário citadas no documento | a equipe confere |
+| Valores informados | informativo: totais do documento compatíveis com os informados (sem mostrar os valores) | a equipe confere |
+
+Resultados:
+
+- **Aprovado na pré-análise** — leitura, CPF, ano e tipo confirmados. O cliente segue para o pagamento e, com o
+  pagamento aprovado, o caso já nasce com o ComprovaBet aprovado (“Aprovado automaticamente na pré-análise”) e
+  em **Aguardando início da análise**.
+- **Conferência pela equipe** — a leitura não confirmou tudo (foto, PDF digitalizado, CPF mascarado). O cliente
+  pode seguir para o pagamento; o caso nasce em “Validação documental” para a equipe aprovar.
+- **Documento com pendência** — arquivo de outro ano (ou de outro CPF): precisa ser trocado antes do pagamento.
+  O servidor refaz a pré-análise ao abrir o pagamento e no envio, então não dá para contornar pela tela.
+
+O resultado fica gravado no rascunho e no caso (`pre_analysis`), aparece no painel e entra na exportação de dados
+do titular. A pré-análise confere o documento, não o resultado do caso.
 
 ## Pagamento da análise
 
@@ -176,8 +207,11 @@ página do Mercado Pago e nunca passam pelo site.
    depois de pagar. Quando ele volta ao site (retorno automático do checkout), vê “Pagamento confirmado” e toca em
    **Solicitar análise**, que mostra o protocolo (a ação é idempotente: não duplica o caso). Se a notificação
    atrasar, a tela consulta o Mercado Pago a cada poucos segundos.
-5. O caso nasce em “Validação documental” com o pagamento confirmado; o prazo estimado (`REVIEW_DAYS`) conta a
-   partir daí. Ao aprovar o ComprovaBet, o caso fica em **Aguardando início da análise**.
+5. Com o ComprovaBet aprovado na pré-análise, o caso nasce em **Aguardando início da análise**; sem a aprovação
+   automática, nasce em “Validação documental” e fica nesse status até a equipe aprovar. O prazo (`REVIEW_DAYS`, em
+   **dias úteis**) conta a partir do envio: em até 15 dias úteis a equipe entra em contato para apresentar o
+   resultado e, se o caso puder prosseguir, combinar as condições e as formas de pagamento das próximas etapas.
+   Dias úteis excluem sábados, domingos, feriados nacionais, Carnaval e Corpus Christi (`src/lib/business-days.ts`).
 
 Detalhes de segurança: rascunho com pagamento aprovado (ou aberto nas últimas 24 horas) não pode ser apagado;
 cliques repetidos reaproveitam o mesmo checkout; todas as tentativas (inclusive recusadas) ficam no caso, e o
@@ -281,7 +315,8 @@ npm test
 
 Cobrem formatação de valores, cálculo da perda, validação do formulário no servidor, CPF (dígitos verificadores,
 máscaras, busca no texto e conferência de PDFs com CPF igual, divergente, mascarado ou ausente), linha do tempo
-em 6 etapas (com o pagamento antes ou depois da validação), a tela de pagamento, o Mercado Pago (status,
+em 6 etapas (com o pagamento antes ou depois da validação), a pré-análise automática (CPF, ano, tipo, plataformas,
+valores, arquivos com e sem texto), o prazo em dias úteis (feriados e Páscoa), a tela de pagamento, o Mercado Pago (status,
 assinatura das notificações, checkout e consultas com respostas simuladas), regras de divergência e de andamento,
 senhas, validação do conteúdo dos arquivos e a leitura automática de CSV, XLSX e PDF.
 
@@ -294,7 +329,8 @@ senhas, validação do conteúdo dos arquivos e a leitura automática de CSV, XL
 - [ ] Usar `AUTH_SECRET` e `CRON_SECRET` fortes e exclusivos de produção.
 - [ ] Confirmar que o bucket está privado e com backup/versionamento conforme a política de retenção.
 - [ ] Testar a leitura automática com históricos reais de cada plataforma e ajustar as regras se necessário.
-- [ ] Testar a conferência do CPF com ComprovaBets reais (PDF com texto) e conferir `COMPROVABET_YEAR`.
+- [ ] Testar a conferência do CPF e a pré-análise com ComprovaBets reais (PDF com texto) e conferir `COMPROVABET_YEAR`.
+      Se o documento real usar outros termos, ajuste as regras de tipo e de valores em `src/lib/documents/pre-analysis-check.ts`.
 - [ ] Configurar o pagamento: `ANALYSIS_PRICE`, `MERCADOPAGO_ACCESS_TOKEN` e `MERCADOPAGO_WEBHOOK_SECRET`, e fazer
       um pagamento real de ponta a ponta (Pix e cartão) antes de divulgar o site.
 - [ ] Definir com a assessoria jurídica a política de cancelamento e reembolso (inclusive o direito de
