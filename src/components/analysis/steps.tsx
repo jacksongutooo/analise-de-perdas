@@ -384,7 +384,6 @@ export function CommitmentStep({ data, update, headingRef, reviewDays }: { data:
       </label>
       <div className="mt-4 space-y-1.5 text-sm leading-relaxed text-muted">
         <p>Esse compromisso é pessoal e não representa bloqueio técnico das suas contas.</p>
-        <p>O cumprimento deste compromisso não garante aprovação ou recuperação de valores.</p>
       </div>
       <p className="mt-8 border-t border-dashed border-line-strong pt-5 text-sm leading-relaxed text-ink-soft">
         Se preferir um bloqueio efetivo, a autoexclusão oficial do Governo Federal fica em{" "}
@@ -587,8 +586,8 @@ export function ReviewStep({
         </ReviewRow>
       </dl>
       <p className="mt-4 text-sm leading-relaxed text-muted">
-        Cada caso é analisado individualmente. A análise não garante recuperação, restituição ou recebimento de valores. Em seguida, envie
-        o seu ComprovaBet {year}: ele passa por uma pré-análise automática e, depois, você segue para o pagamento da análise.
+        Em seguida, envie o seu ComprovaBet {year}: ele passa por uma pré-análise automática e, depois, você segue para o pagamento da
+        análise.
       </p>
     </>
   );
@@ -905,9 +904,9 @@ export function PaymentStep({
         </p>
       </div>
 
-      <section className="mt-4 rounded-2xl border border-warn-700/25 bg-warn-50 p-5" aria-labelledby="payment-notice-title">
-        <p id="payment-notice-title" className="flex items-center gap-2 text-base font-semibold text-warn-700">
-          <IconAlert size={19} /> Importante
+      <section className="mt-4 rounded-2xl border border-navy-100 bg-navy-50 p-5" aria-labelledby="payment-notice-title">
+        <p id="payment-notice-title" className="flex items-center gap-2 text-base font-semibold text-navy-900">
+          <IconInfo size={19} /> Importante
         </p>
         <p className="mt-2 text-[0.95rem] leading-relaxed text-ink">{PAYMENT_NOTICE}</p>
       </section>

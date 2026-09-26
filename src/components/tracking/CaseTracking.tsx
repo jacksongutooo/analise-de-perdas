@@ -266,7 +266,7 @@ export function CaseTracking({ data }: { data: ClientCase }) {
           />
           <LedgerRow
             label="Valor validado para análise"
-            hint="Não representa valor a ser recuperado"
+            hint="Definido pela nossa equipe"
             value={data.validatedLossCents === null ? <span className="text-muted">—</span> : formatBRL(data.validatedLossCents)}
           />
           {showDeadline && (
@@ -293,7 +293,7 @@ export function CaseTracking({ data }: { data: ClientCase }) {
 
       <p className="text-sm leading-relaxed text-muted">
         Plataformas: {data.platforms.join(", ")} · {data.documentsCount} {data.documentsCount === 1 ? "documento recebido" : "documentos recebidos"}.
-        Cada caso é analisado individualmente. A análise não garante recuperação, restituição ou recebimento de valores.
+        Cada caso é analisado individualmente pela nossa equipe.
       </p>
     </div>
   );

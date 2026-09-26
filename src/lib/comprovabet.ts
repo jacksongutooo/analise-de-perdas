@@ -45,13 +45,13 @@ export const ANALYSIS_IN_PROGRESS_TEXT =
 
 // ─── Pagamento da análise ─────────────────────────────────────────────────
 export const PAYMENT_NOTICE =
-  "O pagamento refere-se exclusivamente ao serviço de análise do caso. A contratação não garante recuperação, restituição, indenização ou recebimento de qualquer valor.";
+  "O pagamento refere-se ao serviço de análise do seu caso, feito pela nossa equipe com base no ComprovaBet e nas informações enviadas.";
 
 export const SERVICE_TERMS_CHECKBOX =
   "Li e estou de acordo com as condições do serviço de análise e confirmo que as informações e documentos enviados são verdadeiros e pertencem ao solicitante cadastrado.";
 
 /** Versão das condições aceitas antes do pagamento. Mude ao alterar o texto acima ou os Termos de Uso. */
-export const SERVICE_TERMS_VERSION = "2026-09-v3";
+export const SERVICE_TERMS_VERSION = "2026-09-v4";
 
 /** Prazo de retorno da equipe depois do pagamento (em dias úteis). */
 export function contactWithinText(reviewDays: number): string {

@@ -195,9 +195,8 @@ A análise é paga **antes** da solicitação, na última tela do formulário (d
 integrado é o **Mercado Pago Checkout Pro** (Pix e cartão de crédito); os dados do cartão são digitados na
 página do Mercado Pago e nunca passam pelo site.
 
-1. A tela mostra o valor (`ANALYSIS_PRICE`), o aviso **Importante** (o pagamento refere-se exclusivamente ao
-   serviço de análise e não garante recuperação, restituição, indenização ou recebimento de valores) e o
-   **aceite obrigatório** das condições.
+1. A tela mostra o valor (`ANALYSIS_PRICE`), o aviso **Importante** (o pagamento refere-se ao serviço de análise
+   do caso) e o **aceite obrigatório** das condições.
 2. “Pagar a análise” grava o aceite (data e hora, versão dos termos, IP e navegador) e as respostas no
    rascunho, cria a tentativa em `payments` e leva o cliente ao checkout. O valor é sempre definido pelo servidor.
 3. O Mercado Pago avisa o site pelo webhook `/api/payments/webhook/mercadopago` (assinatura conferida com

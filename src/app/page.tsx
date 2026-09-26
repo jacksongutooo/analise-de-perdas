@@ -38,7 +38,7 @@ export default function HomePage() {
           </LinkButton>
           <p className="mt-5 text-sm font-medium text-ink-soft">100% online • Análise documental • Acompanhamento em todas as etapas</p>
           <p className="mt-3 max-w-[52ch] text-sm leading-relaxed text-muted">
-            Cada caso é analisado individualmente. A análise não garante recuperação, restituição ou recebimento de valores.
+            Cada caso é analisado individualmente pela nossa equipe.
           </p>
         </section>
 
