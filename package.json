@@ -14,12 +14,13 @@
     "start": "next start",
     "postinstall": "prisma generate",
     "typecheck": "tsc --noEmit",
-    "test": "tsx --test tests/format.test.ts tests/case-rules.test.ts tests/files.test.ts tests/extraction.test.ts",
+    "test": "tsx --test tests/format.test.ts tests/case-rules.test.ts tests/cpf.test.ts tests/payments.test.ts tests/pre-analysis.test.ts tests/files.test.ts tests/extraction.test.ts",
     "db:migrate": "prisma migrate dev",
     "db:deploy": "prisma migrate deploy",
     "db:seed": "tsx prisma/seed.ts",
     "db:studio": "prisma studio",
-    "admin:create": "tsx scripts/create-admin.ts"
+    "admin:create": "tsx scripts/create-admin.ts",
+    "previa": "node scripts/build-previa.mjs"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.726.0",
