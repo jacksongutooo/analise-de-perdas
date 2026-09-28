@@ -7,6 +7,9 @@ import { formatBRL } from "@/lib/format";
 import { NO_PASSWORD_NOTICE } from "@/lib/options";
 import { analysisPrice } from "@/lib/payments";
 
+// O valor da análise mostrado aqui vem da configuração do servidor (o mesmo cobrado no PIX).
+export const dynamic = "force-dynamic";
+
 export default function HomePage() {
   const year = config.comprovabetYear;
   const price = analysisPrice();
@@ -15,7 +18,7 @@ export default function HomePage() {
     { title: `ComprovaBet ${year}`, hint: "Documento anual em seu nome, de preferência em PDF" },
     { title: "E-mail e WhatsApp", hint: "Para acompanhar o caso e receber orientações" },
     {
-      title: "Pix ou cartão de crédito",
+      title: "Pagamento via PIX",
       hint:
         price && !price.example
           ? `A análise custa ${formatBRL(price.cents)} e é paga no fim do formulário, antes da solicitação`

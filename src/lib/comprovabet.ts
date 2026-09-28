@@ -51,7 +51,7 @@ export const SERVICE_TERMS_CHECKBOX =
   "Li e estou de acordo com as condições do serviço de análise e confirmo que as informações e documentos enviados são verdadeiros e pertencem ao solicitante cadastrado.";
 
 /** Versão das condições aceitas antes do pagamento. Mude ao alterar o texto acima ou os Termos de Uso. */
-export const SERVICE_TERMS_VERSION = "2026-09-v4";
+export const SERVICE_TERMS_VERSION = "2026-09-v5";
 
 /** Requisitos em letras pequenas na página inicial. */
 export function requirementsText(year: number): string {
