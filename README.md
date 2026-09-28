@@ -126,7 +126,8 @@ Formulário (com o CPF) → compromisso → revisão das respostas → envio do 
 (barra de progresso com as conferências) → **pagamento da análise** → Solicitar análise → análise pela equipe →
 contato em até 15 dias úteis → acompanhamento pelo painel.
 
-- `/` — página inicial curta, com o que ter em mãos (CPF, ComprovaBet, e-mail e WhatsApp).
+- `/` — página inicial curta, com o que ter em mãos (CPF, ComprovaBet, e-mail e WhatsApp) e, em letras pequenas, os
+  requisitos: ComprovaBet do ano em mãos, nunca ter pedido o estorno dessas perdas antes e uma solicitação por CPF.
 - `/analise` — formulário em etapas curtas, com barra de progresso, “Voltar”, salvamento automático no navegador
   (“✓ Informações salvas”) e retomada de onde parou. A etapa 6 traz os dados do solicitante com o **CPF**
   (máscara `000.000.000-00` e dígitos verificadores); depois vêm o compromisso voluntário e a revisão

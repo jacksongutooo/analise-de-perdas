@@ -1,7 +1,7 @@
 import { IconFile, IconLock, IconShield } from "@/components/icons";
 import { SiteFooter, SiteHeader } from "@/components/site";
 import { LinkButton } from "@/components/ui";
-import { TRUST_LINE } from "@/lib/comprovabet";
+import { TRUST_LINE, requirementsText } from "@/lib/comprovabet";
 import { config } from "@/lib/env";
 import { formatBRL } from "@/lib/format";
 import { NO_PASSWORD_NOTICE } from "@/lib/options";
@@ -38,7 +38,7 @@ export default function HomePage() {
           </LinkButton>
           <p className="mt-5 text-sm font-medium text-ink-soft">100% online • Análise documental • Acompanhamento em todas as etapas</p>
           <p className="mt-3 max-w-[52ch] text-sm leading-relaxed text-muted">
-            Cada caso é analisado individualmente pela nossa equipe.
+            Cada caso é analisado individualmente pela nossa equipe. {requirementsText(year)}
           </p>
         </section>
 
