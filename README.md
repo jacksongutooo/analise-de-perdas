@@ -113,7 +113,7 @@ acessos de demonstração não entram no painel real. O seed se recusa a rodar e
    fortes, `NEXT_PUBLIC_SITE_URL` com o domínio final (https) e os dados da empresa.
 4. Configure o pagamento: `ANALYSIS_PRICE`, `BLACKCAT_API_KEY` e `BLACKCAT_BASE_URL` (veja “Pagamento da análise”
    abaixo). Sem eles, o formulário avisa que o pagamento está indisponível e o painel mostra um alerta.
-5. O comando de build `vercel-build` já prepara o banco (`scripts/prepare-db.mjs`) e executa `prisma migrate deploy`.
+5. O comando de build `vercel-build` já prepara o banco (`scripts/prepare-deploy.mjs`) e executa `prisma migrate deploy`.
 6. Crie o primeiro acesso rodando `npm run admin:create` localmente apontando para o banco de produção.
 7. `vercel.json` agenda a limpeza diária (`/api/cron/cleanup`), que apaga rascunhos abandonados e seus
    arquivos, sessões vencidas e registros de acesso antigos.
@@ -272,8 +272,9 @@ from payments where provider = 'blackcat' and status = 'paid' order by paid_at d
 Casos antigos em “Aguardando pagamento” (fluxo anterior, pagamento depois da validação) continuam com as
 instruções enviadas pela equipe, “Já fiz o pagamento” e **Confirmar pagamento** no painel.
 
-**Bancos de versões anteriores:** antes de `prisma migrate deploy`, o `vercel-build` roda `scripts/prepare-db.mjs`.
-Em um banco novo ou em dia, ele não faz nada. Se um deploy anterior deixou uma migration com falha, ela é liberada
+**Bancos de versões anteriores:** antes de `prisma migrate deploy`, o `vercel-build` roda `scripts/prepare-deploy.mjs`.
+Em um projeto e um banco em dia, ele não faz nada. Ele remove arquivos de versões anteriores que tenham ficado no
+repositório (o upload pelo GitHub não apaga arquivos). Se um deploy anterior deixou uma migration com falha, ela é liberada
 para rodar de novo (no PostgreSQL a falha não deixa efeitos). Se o banco recebeu a migration
 `20260924100000_add_full_review_payments`, de uma versão antiga do projeto, os objetos dela com o mesmo nome dos
 atuais são renomeados (os dados ficam em `payments_versao_anterior`). Em seguida, a migration
@@ -395,7 +396,7 @@ senhas, validação do conteúdo dos arquivos e a leitura automática de CSV, XL
 | `npm run setup` / `npm run setup:win` | instalação local completa (Linux/macOS e Windows) |
 | `npm run dev` | ambiente de desenvolvimento |
 | `npm run build` / `npm start` | build e execução de produção |
-| `npm run db:deploy` | prepara o banco (`scripts/prepare-db.mjs`) e aplica as migrations |
+| `npm run db:deploy` | prepara o banco (`scripts/prepare-deploy.mjs`) e aplica as migrations |
 | `npm run db:migrate` | cria nova migration em desenvolvimento |
 | `npm run db:seed` | dados fictícios (somente com `DEMO_MODE=true`) |
 | `npm run admin:create -- --email ... --name ...` | cria ou atualiza acesso da equipe (`--role analyst` opcional) |

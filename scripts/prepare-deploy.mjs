@@ -1,18 +1,46 @@
-// Roda antes do "prisma migrate deploy" (npm run vercel-build e npm run db:deploy) e destrava o banco em dois casos
-// que impedem as migrations de rodar. Em um banco novo ou já em dia, não faz nada. Nunca apaga dados.
+// Roda antes do "prisma migrate deploy" (npm run vercel-build e npm run db:deploy). Em um projeto e um banco em dia,
+// não faz nada. Nunca apaga dados.
 //
+// Arquivos: remove arquivos de versões anteriores que não existem mais nesta versão (checkout e webhook do gateway
+// antigo e a migration 20260924100000_add_full_review_payments). Se ficarem no repositório por engano (o upload pelo
+// GitHub não apaga arquivos), quebrariam o build.
+//
+// Banco:
 // 1) Migration que falhou em um deploy anterior: no PostgreSQL cada migration roda numa transação, então a falha não
 //    deixa efeitos. Ela é marcada como revertida (como "prisma migrate resolve --rolled-back") e roda de novo.
 // 2) Migration 20260924100000_add_full_review_payments, de uma versão antiga do projeto que não é mais usada: o tipo
 //    "payment_status" e a tabela "payments" que ela criou têm o mesmo nome dos atuais e são renomeados (os dados ficam
 //    guardados em "payments_versao_anterior"). A migration 20260929120000_limpeza_pagamentos_legados termina a limpeza.
+import { existsSync, readdirSync, rmSync, rmdirSync } from "node:fs";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 import prismaClient from "@prisma/client";
 
 const { PrismaClient } = prismaClient;
 const OBSOLETE_MIGRATION = "20260924100000_add_full_review_payments";
 // Mesma trava usada pelo "prisma migrate deploy": nunca mexe no banco enquanto outro deploy aplica migrations.
 const PRISMA_MIGRATE_LOCK = 72707369;
-const log = (message) => console.log(`[prepare-db] ${message}`);
+const log = (message) => console.log(`[prepare-deploy] ${message}`);
+
+// ─── Arquivos de versões anteriores ───────────────────────────────────────
+const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+const OBSOLETE_PATHS = [
+  `prisma/migrations/${OBSOLETE_MIGRATION}`,
+  "app/pagamento/demonstracao",
+  "app/api/payments/webhook/mercadopago",
+  "lib/payments/mercadopago.ts",
+];
+for (const relative of OBSOLETE_PATHS) {
+  const full = path.join(root, relative);
+  if (!existsSync(full)) continue;
+  rmSync(full, { recursive: true, force: true });
+  log(`removido (arquivo de versão anterior): ${relative}`);
+}
+// Pastas que ficaram vazias.
+for (const relative of ["app/pagamento"]) {
+  const full = path.join(root, relative);
+  if (existsSync(full) && readdirSync(full).length === 0) rmdirSync(full);
+}
 
 const url = process.env.DIRECT_URL || process.env.DATABASE_URL;
 if (!url) {
@@ -100,7 +128,7 @@ try {
     else log("Banco em dia: nada a preparar.");
   }
 } catch (error) {
-  console.error("[prepare-db] Falha ao preparar o banco:", error instanceof Error ? error.message : error);
+  console.error("[prepare-deploy] Falha ao preparar o banco:", error instanceof Error ? error.message : error);
   process.exitCode = 1;
 } finally {
   await prisma.$disconnect();

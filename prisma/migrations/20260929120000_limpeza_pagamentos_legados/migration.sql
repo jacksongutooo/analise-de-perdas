@@ -6,7 +6,7 @@
 --   3. Status de uma versão antiga do fluxo (análise preliminar, aguardando pagamento, análise completa) passam para
 --      os status atuais equivalentes, e o tipo "case_status" fica com os valores do schema atual.
 --   4. Colunas extras dessa versão antiga em "cases" saem quando estão vazias; com dados, ficam guardadas.
---   5. A tabela de pagamentos dessa versão antiga (renomeada por scripts/prepare-db.mjs) sai quando está vazia.
+--   5. A tabela de pagamentos dessa versão antiga (renomeada por scripts/prepare-deploy.mjs) sai quando está vazia.
 
 -- 1. Gateways
 DO $$
