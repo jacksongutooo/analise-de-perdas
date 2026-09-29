@@ -4,7 +4,7 @@
 /** Status interno do pagamento: equivalentes a PENDING, PAID, FAILED, CANCELLED e EXPIRED (e REFUNDED, estorno). */
 export type PaymentStatusValue = "pending" | "paid" | "failed" | "cancelled" | "expired" | "refunded";
 
-export type PaymentProviderId = "blackcat" | "mercadopago" | "demo";
+export type PaymentProviderId = "blackcat" | "demo";
 
 /** Valor usado só na demonstração quando ANALYSIS_PRICE não está configurado. */
 export const DEMO_PRICE_CENTS = 9_700;
@@ -60,7 +60,6 @@ export interface PaymentProviderAdapter {
 
 export const PROVIDER_LABEL: Record<PaymentProviderId, string> = {
   blackcat: "BlackCat",
-  mercadopago: "Mercado Pago",
   demo: "Pagamento de demonstração",
 };
 
@@ -68,13 +67,9 @@ export function providerLabel(id: string): string {
   return PROVIDER_LABEL[id as PaymentProviderId] ?? id;
 }
 
-/** Formas de pagamento. As de cartão ficam só para exibir pagamentos antigos (Mercado Pago). */
+/** Formas de pagamento aceitas. */
 export const PAYMENT_METHOD_LABEL: Record<string, string> = {
   pix: "PIX",
-  credit_card: "Cartão de crédito",
-  debit_card: "Cartão de débito",
-  prepaid_card: "Cartão pré-pago",
-  account_money: "Saldo Mercado Pago",
 };
 
 export function paymentMethodLabel(method: string | null | undefined): string {
