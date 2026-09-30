@@ -12,6 +12,9 @@ automática dos documentos, conferência de valores e solicitação de documento
 > O site **não promete recuperação, restituição ou indenização**, não se apresenta como serviço oficial
 > ou governamental e não usa números, depoimentos ou contadores fictícios.
 
+O projeto também tem, em `/kit-de-natal`, a página de vendas do **Kit de Natal Completo** (loja Natal Encantado),
+independente do fluxo de análise: veja [Página de vendas: Kit de Natal Completo](#página-de-vendas-kit-de-natal-completo).
+
 ## Stack
 
 - **Next.js 15** (App Router, Server Actions, Route Handlers) + **React 19** + **TypeScript**
@@ -35,6 +38,8 @@ Para gerar de novo depois de alterar o site: `npm run previa` (script `scripts/b
 exemplo e arquivos de exemplo do ComprovaBet (com o CPF informado, com outro CPF e uma foto). O pagamento da
 análise usa o PIX simulado do modo demonstração (QR Code e copia e cola fictícios, com botões para simular a
 confirmação ou o vencimento), sem cobrar nada.
+
+A página de vendas do Kit de Natal fica de fora desta prévia e tem a sua própria: `npm run previa:natal`.
 
 ## Rodando localmente
 
@@ -367,7 +372,9 @@ máscaras, busca no texto e conferência de PDFs com CPF igual, divergente, masc
 em 6 etapas (com o pagamento antes ou depois da validação), a pré-análise automática (CPF, ano, tipo, plataformas,
 valores, arquivos com e sem texto), o prazo em dias úteis (feriados e Páscoa), a tela de pagamento, a BlackCat (criação do
 PIX, consulta de status, notificações e erros, com respostas simuladas) e o QR Code, regras de divergência e de andamento,
-senhas, validação do conteúdo dos arquivos e a leitura automática de CSV, XLSX e PDF.
+senhas, validação do conteúdo dos arquivos e a leitura automática de CSV, XLSX e PDF. Na página do Kit de Natal: preços,
+total separado e economia, o link de checkout de cada produto, o repasse dos parâmetros de campanha e as 20 avaliações
+provisórias.
 
 ## Antes de publicar
 
@@ -389,6 +396,67 @@ senhas, validação do conteúdo dos arquivos e a leitura automática de CSV, XL
 - [ ] A etapa 7 traz uma linha discreta sobre a autoexclusão oficial (gov.br/autoexclusaoapostas).
       Remova em `components/analysis/steps.tsx` se não fizer sentido para a operação.
 
+## Página de vendas: Kit de Natal Completo
+
+Página de vendas da loja **Natal Encantado** em `/kit-de-natal`, mobile first e pensada para tráfego pago. É
+independente do fluxo de análise: não usa banco, sessão nem variáveis de ambiente próprias e é gerada de forma
+estática no build (servida pronta pela CDN, sem esperar servidor). O restante do site não muda.
+
+- **Rodar localmente:** `npm install` e `npm run dev`, depois `http://localhost:3000/kit-de-natal` (esta página não
+  precisa do PostgreSQL).
+- **Prévia em um único arquivo:** `npm run previa:natal` gera `previa/kit-de-natal.html`, que abre no navegador sem
+  instalar nada (fontes, estilos e imagens embutidos). Roda o mesmo código da página.
+
+| O que mudar | Onde |
+|---|---|
+| Links de checkout (usados por todos os botões de compra) | `lib/natal/checkout.ts`: `CHECKOUT_KIT`, `CHECKOUT_ARVORE`, `CHECKOUT_PISCA`, `CHECKOUT_ACESSORIOS` |
+| Preços, nomes e textos dos produtos | `lib/natal/products.ts` (o total separado e a economia são calculados) |
+| Avaliações | `lib/natal/reviews.ts` e fotos em `public/images/reviews/` |
+| Razão social, CNPJ, e-mail, endereço, links das políticas, prazos da pré-venda e rastreamento | `lib/natal/store.ts` |
+| Imagens | `public/images/` (mesmos nomes de arquivo) |
+| Seções e visual | `components/natal/` (página em `app/kit-de-natal/page.tsx`, cores em `app/globals.css`) |
+
+**Checkout e tráfego pago.** Os links estão como `#` até serem configurados. Cada botão tem `data-checkout` (`kit`,
+`arvore`, `pisca`, `acessorios`) e `data-placement` (onde fica na página), úteis para eventos no pixel ou no Gerenciador
+de Tags. Com links externos (https), a página repassa ao checkout os parâmetros de campanha da URL (`utm_*`, `src`,
+`sck`, `fbclid`, `gclid`, `gbraid`, `wbraid`, `ttclid`, `msclkid`), sem sobrescrever os que o link já tiver.
+
+**Imagens.** As 7 imagens atuais são **ilustrações provisórias**, com a marca discreta "Imagem ilustrativa". Troque
+pelas fotos reais do produto mantendo o nome do arquivo (WebP). O `next/image` gera os tamanhos de cada tela, então
+basta uma foto grande. As imagens ficam sempre dentro da moldura (`object-fit: cover`): uma foto de outra proporção é
+recortada nas bordas, nunca esticada nem colocada sobre textos; mantenha o produto centralizado.
+
+| Arquivo | Onde aparece | Proporção (sugestão) |
+|---|---|---|
+| `hero-kit-natal.webp` | topo (árvore montada e decorada) e card do kit | 1:1 (1200×1200) |
+| `kit-completo.webp` | galeria do topo e "O que chega na sua casa" | 1:1 (1200×1200) |
+| `arvore-150cm.webp`, `pisca-pisca-led.webp`, `acessorios-natal.webp` | galeria, "Seu Natal completo" e compra separada | 1:1 (1000×1000) |
+| `embalagem-kit.webp` | embalagem | 4:3 (1200×900) |
+| `natal-ambiente.webp` | "Imagine sua casa assim" | 16:10 (1600×1000) |
+
+**Avaliações.** São 20 cards provisórios ("AVALIAÇÃO REAL SERÁ INSERIDA AQUI"), marcados no código como
+`PLACEHOLDER`. Para cada avaliação real, preencha `name`, `rating` (1 a 5) e `text` e, se houver, `date`
+(`"2026-12-10"` ou texto livre), `product` e `verified: true` (só com a compra confirmada; sem isso o selo "Compra
+verificada" não aparece). A foto vai em `public/images/reviews/cliente-01.webp` (ou no caminho de `avatar`); enquanto
+o arquivo não existir, o card mostra um avatar neutro com as iniciais. A página não mostra nota média nem total de
+avaliações.
+
+**Pré-venda.** A urgência da página é só a condição de pré-venda: sem contador, sem "restam X unidades" e sem data de
+encerramento. Os prazos da pergunta "O que significa pré-venda?" (início dos envios, processamento e entrega)
+aparecem como "a informar" até serem preenchidos em `PRE_SALE` (`lib/natal/store.ts`).
+
+**Antes de publicar a página:**
+
+- [ ] Links reais nas 4 constantes de `lib/natal/checkout.ts` e uma compra de teste por botão.
+- [ ] Fotos reais nos 7 arquivos de `public/images/` (hoje são ilustrações).
+- [ ] Avaliações reais em `lib/natal/reviews.ts`.
+- [ ] Dados da empresa, links das políticas (hoje `#`), prazos da pré-venda e rastreamento em `lib/natal/store.ts`. O
+      rodapé da página usa esses links, e não a Política de Privacidade e os Termos do serviço de análise.
+- [ ] `NEXT_PUBLIC_SITE_URL` com o domínio onde a página vai rodar (usado no canonical, no Open Graph e nos dados
+      estruturados do produto). A imagem de compartilhamento fica em `/kit-de-natal/opengraph-image`.
+- [ ] Se a loja tiver domínio próprio, publique este projeto nesse domínio e aponte os anúncios para `/kit-de-natal`
+      (ou mova a rota para a raiz).
+
 ## Scripts
 
 | Comando | O que faz |
@@ -403,3 +471,4 @@ senhas, validação do conteúdo dos arquivos e a leitura automática de CSV, XL
 | `npm test` | testes automatizados |
 | `npm run typecheck` | checagem de tipos |
 | `npm run previa` | gera a prévia navegável (`previa/index.html`) |
+| `npm run previa:natal` | gera a prévia da página do Kit de Natal (`previa/kit-de-natal.html`) |

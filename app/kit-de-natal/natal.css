@@ -1,0 +1,127 @@
+/* Estilos da página /kit-de-natal que não viram classes do Tailwind (animações, texturas e o acordeão).
+   As cores repetem os tokens pine/gold/cream de app/globals.css. */
+
+html:has(.natal-page) {
+  scroll-behavior: smooth;
+}
+
+body:has(.natal-page) {
+  background: #fdfbf6;
+}
+
+.natal-page {
+  interpolate-size: allow-keywords;
+}
+
+.natal-page :focus-visible {
+  outline: 2px solid #bc923b;
+  outline-offset: 3px;
+}
+
+/* Blocos que aparecem ao rolar. Só ficam escondidos depois que o JavaScript liga o efeito
+   (data-reveal="on"); sem JavaScript, tudo aparece normalmente. */
+.natal-page[data-reveal="on"] .reveal:not(.is-visible) {
+  opacity: 0;
+}
+
+.natal-page[data-reveal="on"] .reveal.is-visible {
+  animation: natal-reveal 0.75s cubic-bezier(0.2, 0.7, 0.2, 1) backwards;
+}
+
+@keyframes natal-reveal {
+  from {
+    opacity: 0;
+    transform: translateY(18px);
+  }
+}
+
+/* Brilho discreto que atravessa os botões principais de tempos em tempos. */
+.shine {
+  position: relative;
+  overflow: hidden;
+  isolation: isolate;
+}
+
+.shine::after {
+  content: "";
+  position: absolute;
+  inset: -30% auto -30% 0;
+  width: 38%;
+  background: linear-gradient(100deg, transparent 0%, rgb(255 255 255 / 0.32) 50%, transparent 100%);
+  transform: translateX(-160%) skewX(-18deg);
+  animation: natal-shine 6.5s ease-in-out 1.5s infinite;
+  pointer-events: none;
+}
+
+@keyframes natal-shine {
+  0%,
+  72% {
+    transform: translateX(-160%) skewX(-18deg);
+  }
+  100% {
+    transform: translateX(380%) skewX(-18deg);
+  }
+}
+
+/* Carrosséis sem barra de rolagem visível (o toque e as setas continuam funcionando). */
+.no-scrollbar {
+  scrollbar-width: none;
+}
+
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+/* Pontinhos de luz nos fundos verdes. */
+.natal-stars {
+  background-image:
+    radial-gradient(rgb(226 196 124 / 0.34) 1px, transparent 1.5px),
+    radial-gradient(rgb(255 255 255 / 0.14) 1px, transparent 1.5px),
+    radial-gradient(rgb(226 196 124 / 0.2) 1.3px, transparent 1.9px);
+  background-size:
+    173px 173px,
+    119px 119px,
+    229px 229px;
+  background-position:
+    21px 34px,
+    77px 9px,
+    140px 120px;
+}
+
+/* Borda serrilhada de "notinha" (comparação de preços). */
+.receipt-edge {
+  -webkit-mask: conic-gradient(from -45deg at bottom, #0000, #000 1deg 89deg, #0000 90deg) 50% / 22px 100%;
+  mask: conic-gradient(from -45deg at bottom, #0000, #000 1deg 89deg, #0000 90deg) 50% / 22px 100%;
+}
+
+/* Perguntas frequentes: abre e fecha com transição onde o navegador permite. */
+.natal-faq summary::-webkit-details-marker {
+  display: none;
+}
+
+.natal-faq details::details-content {
+  block-size: 0;
+  overflow-y: clip;
+  transition:
+    block-size 0.3s ease,
+    content-visibility 0.3s allow-discrete;
+}
+
+.natal-faq details[open]::details-content {
+  block-size: auto;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html:has(.natal-page) {
+    scroll-behavior: auto;
+  }
+  .shine::after {
+    display: none;
+  }
+  .natal-page[data-reveal="on"] .reveal:not(.is-visible) {
+    opacity: 1;
+  }
+  .natal-page[data-reveal="on"] .reveal.is-visible {
+    animation: none;
+  }
+}

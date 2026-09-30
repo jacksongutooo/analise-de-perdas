@@ -42,7 +42,10 @@ const routeOf = (dir) =>
     .filter((seg) => seg && !/^\(.*\)$/.test(seg))
     .join("/");
 
-const files = await walk(appDir);
+// A página de vendas do Kit de Natal (app/kit-de-natal) não faz parte desta prévia: ela tem a sua própria
+// (npm run previa:natal, script scripts/build-previa-natal.mjs).
+const ownPreview = [path.join(appDir, "kit-de-natal") + path.sep];
+const files = (await walk(appDir)).filter((file) => !ownPreview.some((dir) => file.startsWith(dir)));
 const byName = (name) => files.filter((f) => path.basename(f) === name);
 const rootLayout = path.join(appDir, "layout.tsx");
 const layouts = byName("layout.tsx").filter((f) => f !== rootLayout);
