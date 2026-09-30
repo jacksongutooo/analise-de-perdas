@@ -8,7 +8,7 @@ import {
   CHECKOUT_PISCA,
   withCampaignParams,
 } from "@/lib/natal/checkout";
-import { INDIVIDUAL_PRODUCTS, KIT, KIT_SAVINGS_CENTS, PRODUCTS, SEPARATE_TOTAL_CENTS } from "@/lib/natal/products";
+import { INDIVIDUAL_PRODUCTS, KIT, KIT_SAVINGS_CENTS, PRODUCTS, PURCHASE_OPTIONS, SEPARATE_TOTAL_CENTS } from "@/lib/natal/products";
 import { publicFileExists } from "@/lib/natal/public-files";
 import { REVIEW_PLACEHOLDER_TEXT, clampRating, formatReviewDate, initials, reviews, toReviewView } from "@/lib/natal/reviews";
 
@@ -30,6 +30,23 @@ describe("página do Kit de Natal: preços", () => {
     assert.deepEqual(
       INDIVIDUAL_PRODUCTS.map((p) => p.id),
       ["arvore", "pisca", "acessorios"],
+    );
+  });
+});
+
+describe("página do Kit de Natal: seletor de compra", () => {
+  test("kit primeiro (opção inicial), depois árvore, pisca-pisca e acessórios", () => {
+    assert.deepEqual(
+      PURCHASE_OPTIONS.map((p) => p.id),
+      ["kit", "arvore", "pisca", "acessorios"],
+    );
+    assert.deepEqual(
+      PURCHASE_OPTIONS.map((p) => p.label),
+      ["Kit Completo", "Somente a árvore", "Somente o pisca-pisca", "Somente os acessórios"],
+    );
+    assert.deepEqual(
+      PURCHASE_OPTIONS.map((p) => p.cta),
+      ["Quero garantir meu kit", "Comprar árvore", "Comprar pisca-pisca", "Comprar acessórios"],
     );
   });
 });

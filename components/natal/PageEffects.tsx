@@ -1,13 +1,11 @@
 "use client";
 
 import { useEffect } from "react";
-import { withCampaignParams } from "@/lib/natal/checkout";
 
 /**
  * Efeitos da página /kit-de-natal, sem biblioteca:
  * - blocos com a classe "reveal" aparecem suavemente ao entrar na tela (sem JavaScript, tudo fica visível);
- * - links para uma pergunta frequente abrem a resposta;
- * - os parâmetros de campanha da URL (utm_*, fbclid, gclid...) são repassados aos links de checkout externos.
+ * - links para uma pergunta frequente abrem a resposta.
  */
 export function PageEffects({ rootId }: { rootId: string }) {
   useEffect(() => {
@@ -42,16 +40,6 @@ export function PageEffects({ rootId }: { rootId: string }) {
     openFromHash();
     window.addEventListener("hashchange", openFromHash);
     return () => window.removeEventListener("hashchange", openFromHash);
-  }, []);
-
-  useEffect(() => {
-    const search = window.location.search;
-    if (!search) return;
-    for (const link of document.querySelectorAll<HTMLAnchorElement>("a[data-checkout]")) {
-      const href = link.getAttribute("href") ?? "";
-      const next = withCampaignParams(href, search);
-      if (next !== href) link.setAttribute("href", next);
-    }
   }, []);
 
   return null;

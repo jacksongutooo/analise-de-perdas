@@ -1,14 +1,30 @@
 "use client";
 
 import Image from "next/image";
-import { useRef, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { cx } from "@/lib/cx";
-import type { ImageAsset } from "@/lib/natal/products";
+import type { ImageAsset, ProductId } from "@/lib/natal/products";
+import { usePurchase } from "./PurchaseContext";
 
-/** Galeria do topo: desliza com o dedo no celular e troca pelas miniaturas a partir do tablet. */
-export function HeroGallery({ images, seal }: { images: ImageAsset[]; seal: ReactNode }) {
+/**
+ * Galeria do produto: desliza com o dedo no celular e troca pelas miniaturas a partir do tablet. Ao escolher uma
+ * opção de compra, mostra a imagem dela (focus: índice da imagem de cada opção).
+ */
+export function HeroGallery({ images, seal, focus }: { images: ImageAsset[]; seal: ReactNode; focus?: Partial<Record<ProductId, number>> }) {
   const trackRef = useRef<HTMLDivElement>(null);
   const [active, setActive] = useState(0);
+  const { selected } = usePurchase();
+  const firstRender = useRef(true);
+
+  useEffect(() => {
+    if (firstRender.current) {
+      firstRender.current = false;
+      return;
+    }
+    const index = focus?.[selected];
+    const track = trackRef.current;
+    if (index !== undefined && track) track.scrollTo({ left: index * track.clientWidth, behavior: "smooth" });
+  }, [selected, focus]);
 
   function onScroll() {
     const track = trackRef.current;

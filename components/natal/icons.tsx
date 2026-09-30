@@ -83,17 +83,6 @@ export const IconTag = (p: IconProps) =>
     ),
   });
 
-export const IconCalendar = (p: IconProps) =>
-  icon({
-    ...p,
-    children: (
-      <>
-        <rect x="3.5" y="5" width="17" height="15.5" rx="2" />
-        <path d="M3.5 10h17M8 3v4M16 3v4" />
-      </>
-    ),
-  });
-
 export const IconCheckCircle = (p: IconProps) =>
   icon({
     ...p,
@@ -105,7 +94,6 @@ export const IconCheckCircle = (p: IconProps) =>
     ),
   });
 
-export const IconArrowDown = (p: IconProps) => icon({ ...p, children: <path d="M12 5v14M6.5 13.5 12 19l5.5-5.5" /> });
 export const IconArrowRight = (p: IconProps) => icon({ ...p, children: <path d="M5 12h14M13.5 6.5 19 12l-5.5 5.5" /> });
 
 /** Estrela cheia (notas das avaliações). */

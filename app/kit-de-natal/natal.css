@@ -88,12 +88,6 @@ body:has(.natal-page) {
     140px 120px;
 }
 
-/* Borda serrilhada de "notinha" (comparação de preços). */
-.receipt-edge {
-  -webkit-mask: conic-gradient(from -45deg at bottom, #0000, #000 1deg 89deg, #0000 90deg) 50% / 22px 100%;
-  mask: conic-gradient(from -45deg at bottom, #0000, #000 1deg 89deg, #0000 90deg) 50% / 22px 100%;
-}
-
 /* Perguntas frequentes: abre e fecha com transição onde o navegador permite. */
 .natal-faq summary::-webkit-details-marker {
   display: none;

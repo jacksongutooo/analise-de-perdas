@@ -1,12 +1,12 @@
 import type { Metadata, Viewport } from "next";
 import { Fraunces } from "next/font/google";
+import { ProductDetails } from "@/components/natal/details";
 import { Faq } from "@/components/natal/faq";
-import { Hero, PreSaleNotice } from "@/components/natal/hero";
 import { StoreFooter, StoreHeader, TopBar } from "@/components/natal/layout";
-import { ChooseOffer, Comparison, FinalOffer, WhatArrives } from "@/components/natal/offers";
 import { PageEffects } from "@/components/natal/PageEffects";
+import { ProductSection } from "@/components/natal/product";
+import { PurchaseProvider } from "@/components/natal/PurchaseContext";
 import { Reviews } from "@/components/natal/reviews";
-import { Ambience, KitContents, Packaging, WhyKit } from "@/components/natal/sections";
 import { StickyBuyBar } from "@/components/natal/StickyBuyBar";
 import { cx } from "@/lib/cx";
 import { formatBRL } from "@/lib/format";
@@ -15,8 +15,9 @@ import { STORE } from "@/lib/natal/store";
 import { site } from "@/lib/site";
 import "./natal.css";
 
-// Página de vendas do Kit de Natal Completo (loja "Natal Encantado"), independente do restante do site.
-// Textos de preço vêm de lib/natal/products.ts e os links de compra de lib/natal/checkout.ts.
+// Página de produto do Kit de Natal Completo (loja "Natal Encantado"), independente do restante do site: galeria e
+// área de compra com as opções (kit ou produtos separados), descrição curta, avaliações e perguntas frequentes.
+// Preços vêm de lib/natal/products.ts e os links de compra de lib/natal/checkout.ts.
 
 const display = Fraunces({ subsets: ["latin"], variable: "--font-fraunces", display: "swap" });
 
@@ -62,33 +63,27 @@ const productJsonLd = JSON.stringify({
 
 export default function KitDeNatalPage() {
   return (
-    <div id="natal" className={cx(display.variable, "natal-page flex min-h-dvh flex-col bg-cream-50 text-stone-700")}>
-      <a
-        href="#conteudo"
-        className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-50 focus:rounded-lg focus:bg-white focus:px-4 focus:py-2 focus:font-semibold focus:text-pine-950 focus:shadow-card"
-      >
-        Pular para o conteúdo
-      </a>
-      <TopBar />
-      <StoreHeader />
-      <main id="conteudo" className="flex-1">
-        <Hero />
-        <PreSaleNotice />
-        <KitContents />
-        <Ambience />
-        <WhyKit />
-        <ChooseOffer />
-        <Comparison />
-        <Packaging />
-        <WhatArrives />
-        <Reviews />
-        <FinalOffer />
-        <Faq />
-      </main>
-      <StoreFooter />
-      <StickyBuyBar watchId="topo" />
-      <PageEffects rootId="natal" />
-      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: productJsonLd }} />
-    </div>
+    <PurchaseProvider>
+      <div id="natal" className={cx(display.variable, "natal-page flex min-h-dvh flex-col bg-cream-50 text-stone-700")}>
+        <a
+          href="#conteudo"
+          className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-50 focus:rounded-lg focus:bg-white focus:px-4 focus:py-2 focus:font-semibold focus:text-pine-950 focus:shadow-card"
+        >
+          Pular para o conteúdo
+        </a>
+        <TopBar />
+        <StoreHeader />
+        <main id="conteudo" className="flex-1">
+          <ProductSection />
+          <ProductDetails />
+          <Reviews />
+          <Faq />
+        </main>
+        <StoreFooter />
+        <StickyBuyBar />
+        <PageEffects rootId="natal" />
+        <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: productJsonLd }} />
+      </div>
+    </PurchaseProvider>
   );
 }

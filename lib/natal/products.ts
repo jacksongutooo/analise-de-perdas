@@ -19,17 +19,17 @@ export type ProductId = "kit" | "arvore" | "pisca" | "acessorios";
 
 export type Product = {
   id: ProductId;
-  /** Rótulo curto acima do nome ("Somente a árvore") */
+  /** Opção no seletor de compra ("Somente a árvore") */
   label: string;
-  /** Nome no card de compra */
-  title: string;
-  /** Nome curto nas comparações de preço ("Pisca-pisca") */
+  /** Nome do produto (barra fixa de compra) */
+  name: string;
+  /** Nome curto nas listas de preço ("Pisca-pisca") */
   shortName: string;
-  /** Linha curta abaixo do nome */
-  subtitle: string;
-  description: string;
+  /** Linha de detalhe da opção */
+  detail: string;
   priceCents: number;
   checkout: string;
+  /** Texto do botão de compra quando a opção está selecionada */
   cta: string;
   image: ImageAsset;
 };
@@ -37,23 +37,21 @@ export type Product = {
 export const PRODUCTS: Record<ProductId, Product> = {
   kit: {
     id: "kit",
-    label: "Kit completo",
-    title: "Kit Completo",
-    shortName: "Kit completo",
-    subtitle: "Árvore 1,5 m + Pisca-pisca LED + Acessórios",
-    description: "Os principais itens para montar a decoração de Natal em uma única compra.",
+    label: "Kit Completo",
+    name: "Kit Completo",
+    shortName: "Kit Completo",
+    detail: "Árvore 1,5\u00a0m + Pisca-pisca LED + Acessórios",
     priceCents: 6790,
     checkout: CHECKOUT_KIT,
-    cta: "Quero o kit completo",
+    cta: "Quero garantir meu kit",
     image: IMAGES.kit,
   },
   arvore: {
     id: "arvore",
     label: "Somente a árvore",
-    title: "Árvore",
+    name: "Árvore 1,5\u00a0m",
     shortName: "Árvore",
-    subtitle: "1,5 m",
-    description: "Árvore de Natal de aproximadamente 1,5 metro.",
+    detail: "Árvore de Natal de aproximadamente 1,5 metro.",
     priceCents: 4990,
     checkout: CHECKOUT_ARVORE,
     cta: "Comprar árvore",
@@ -62,10 +60,9 @@ export const PRODUCTS: Record<ProductId, Product> = {
   pisca: {
     id: "pisca",
     label: "Somente o pisca-pisca",
-    title: "Pisca-pisca LED",
+    name: "Pisca-pisca LED",
     shortName: "Pisca-pisca",
-    subtitle: "Várias programações",
-    description: "Pisca-pisca em LED com várias opções/programações de iluminação.",
+    detail: "Pisca-pisca em LED com várias opções/programações de iluminação.",
     priceCents: 1990,
     checkout: CHECKOUT_PISCA,
     cta: "Comprar pisca-pisca",
@@ -74,10 +71,9 @@ export const PRODUCTS: Record<ProductId, Product> = {
   acessorios: {
     id: "acessorios",
     label: "Somente os acessórios",
-    title: "Acessórios",
+    name: "Acessórios",
     shortName: "Acessórios",
-    subtitle: "Kit de decoração",
-    description: "Kit de acessórios e enfeites para decoração.",
+    detail: "Kit de acessórios e enfeites para decoração.",
     priceCents: 2390,
     checkout: CHECKOUT_ACESSORIOS,
     cta: "Comprar acessórios",
@@ -87,6 +83,8 @@ export const PRODUCTS: Record<ProductId, Product> = {
 
 export const KIT = PRODUCTS.kit;
 export const INDIVIDUAL_PRODUCTS = [PRODUCTS.arvore, PRODUCTS.pisca, PRODUCTS.acessorios];
+/** Ordem das opções no seletor de compra. */
+export const PURCHASE_OPTIONS = [KIT, ...INDIVIDUAL_PRODUCTS];
 
 /** Soma dos três produtos comprados separadamente (R$ 93,70). */
 export const SEPARATE_TOTAL_CENTS = INDIVIDUAL_PRODUCTS.reduce((sum, product) => sum + product.priceCents, 0);

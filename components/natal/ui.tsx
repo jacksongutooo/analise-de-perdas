@@ -1,7 +1,6 @@
 import type { ReactNode } from "react";
 import { cx } from "@/lib/cx";
 import { formatBRL } from "@/lib/format";
-import type { ProductId } from "@/lib/natal/products";
 import { IconSparkles } from "./icons";
 
 // Peças visuais da página /kit-de-natal.
@@ -10,8 +9,8 @@ export function Container({ children, className }: { children: ReactNode; classN
   return <div className={cx("mx-auto w-full max-w-6xl px-4 sm:px-6 lg:px-8", className)}>{children}</div>;
 }
 
-type CtaVariant = "berry" | "pine" | "light" | "outline";
-type CtaSize = "md" | "lg";
+export type CtaVariant = "berry" | "pine" | "light" | "outline";
+export type CtaSize = "md" | "lg";
 
 const CTA_VARIANTS: Record<CtaVariant, string> = {
   berry: "bg-berry-600 text-white shadow-[0_10px_24px_-12px_rgb(163_30_38/0.75)] hover:bg-berry-700 active:bg-berry-800",
@@ -27,36 +26,6 @@ export function ctaClasses(variant: CtaVariant = "berry", size: CtaSize = "lg", 
     size === "md" && "min-h-12 px-5 text-[0.8rem]",
     CTA_VARIANTS[variant],
     className,
-  );
-}
-
-/**
- * Botão de compra. O href SEMPRE vem de uma das constantes de lib/natal/checkout.ts (via PRODUCTS).
- * data-checkout identifica o produto (útil para eventos de pixel/tag manager).
- */
-export function CheckoutLink({
-  href,
-  product,
-  placement,
-  variant = "berry",
-  size = "lg",
-  shine = false,
-  className,
-  children,
-}: {
-  href: string;
-  product: ProductId;
-  placement: string;
-  variant?: CtaVariant;
-  size?: CtaSize;
-  shine?: boolean;
-  className?: string;
-  children: ReactNode;
-}) {
-  return (
-    <a href={href} data-checkout={product} data-placement={placement} className={ctaClasses(variant, size, cx(shine && "shine", className))}>
-      {children}
-    </a>
   );
 }
 
@@ -147,17 +116,6 @@ export function SectionHeading({
         {title}
       </h2>
       {intro && <p className={cx("mt-4 text-pretty text-[1.02rem] leading-relaxed", dark ? "text-cream-100/80" : "text-stone-600")}>{intro}</p>}
-    </div>
-  );
-}
-
-/** Ornamento discreto: linha dourada com uma estrela no centro. */
-export function Ornament({ className }: { className?: string }) {
-  return (
-    <div aria-hidden="true" className={cx("flex items-center justify-center gap-3 text-gold-400", className)}>
-      <span className="h-px w-12 bg-linear-to-r from-transparent to-gold-400/70" />
-      <IconSparkles size={14} />
-      <span className="h-px w-12 bg-linear-to-l from-transparent to-gold-400/70" />
     </div>
   );
 }

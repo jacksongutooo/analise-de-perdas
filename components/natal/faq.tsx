@@ -2,7 +2,7 @@ import type { ReactNode } from "react";
 import { INDIVIDUAL_PRODUCTS, KIT } from "@/lib/natal/products";
 import { NOT_INFORMED, PRE_SALE, STORE_LINKS } from "@/lib/natal/store";
 import { IconArrowRight, IconPlus } from "./icons";
-import { Container, Money, SectionHeading } from "./ui";
+import { Money, SectionHeading } from "./ui";
 
 function Pending({ value }: { value: string }) {
   return value ? <>{value}</> : <span className="italic text-stone-400">{NOT_INFORMED}</span>;
@@ -108,19 +108,10 @@ const FAQ: { id?: string; question: string; answer: ReactNode }[] = [
 
 export function Faq() {
   return (
-    <section id="faq" aria-labelledby="faq-title" className="bg-cream-50 py-16 sm:py-24">
-      <Container className="grid gap-10 lg:grid-cols-12 lg:gap-16">
-        <div className="lg:col-span-4">
-          <SectionHeading id="faq-title" align="left" eyebrow="Dúvidas" title="Perguntas Frequentes" />
-          <p className="mt-4 max-w-sm leading-relaxed text-stone-600">
-            Não encontrou o que procurava?{" "}
-            <a href={STORE_LINKS.atendimento} className="font-semibold text-pine-800 underline decoration-gold-400 decoration-2 underline-offset-4">
-              Fale com o atendimento
-            </a>
-            .
-          </p>
-        </div>
-        <div className="natal-faq divide-y divide-pine-900/10 rounded-[1.75rem] border border-pine-900/10 bg-white px-5 shadow-card sm:px-7 lg:col-span-8">
+    <section id="faq" aria-labelledby="faq-title" className="bg-cream-50 py-14 sm:py-20">
+      <div className="mx-auto w-full max-w-3xl px-4 sm:px-6 lg:px-8">
+        <SectionHeading id="faq-title" eyebrow="Dúvidas" title="Perguntas Frequentes" />
+        <div className="natal-faq mt-8 divide-y divide-pine-900/10 rounded-[1.75rem] border border-pine-900/10 bg-white px-5 shadow-card sm:mt-10 sm:px-7">
           {FAQ.map((item) => (
             <details key={item.question} id={item.id} name="faq" className="group scroll-mt-6">
               <summary className="flex cursor-pointer list-none items-center justify-between gap-4 py-5 text-left text-[1.02rem] font-semibold leading-snug text-pine-950 transition-colors hover:text-pine-700">
@@ -133,7 +124,14 @@ export function Faq() {
             </details>
           ))}
         </div>
-      </Container>
+        <p className="mt-6 text-center leading-relaxed text-stone-600">
+          Não encontrou o que procurava?{" "}
+          <a href={STORE_LINKS.atendimento} className="font-semibold text-pine-800 underline decoration-gold-400 decoration-2 underline-offset-4">
+            Fale com o atendimento
+          </a>
+          .
+        </p>
+      </div>
     </section>
   );
 }

@@ -9,7 +9,7 @@ import { Container, SectionHeading } from "./ui";
 export function Reviews() {
   const items = reviews.map((review) => toReviewView(review, publicFileExists));
   return (
-    <section id="avaliacoes" aria-labelledby="avaliacoes-title" className="overflow-hidden bg-cream-100 py-16 sm:py-24">
+    <section id="avaliacoes" aria-labelledby="avaliacoes-title" className="overflow-hidden bg-white py-14 sm:py-20">
       <Container>
         <SectionHeading
           id="avaliacoes-title"

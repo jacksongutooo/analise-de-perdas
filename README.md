@@ -398,9 +398,11 @@ provisórias.
 
 ## Página de vendas: Kit de Natal Completo
 
-Página de vendas da loja **Natal Encantado** em `/kit-de-natal`, mobile first e pensada para tráfego pago. É
-independente do fluxo de análise: não usa banco, sessão nem variáveis de ambiente próprias e é gerada de forma
-estática no build (servida pronta pela CDN, sem esperar servidor). O restante do site não muda.
+Página de vendas da loja **Natal Encantado** em `/kit-de-natal`, no formato de página de produto de loja, mobile
+first e pensada para tráfego pago: galeria e área de compra com as opções (Kit Completo ou cada produto separado),
+descrição curta com imagens, avaliações, perguntas frequentes e barra fixa de compra no celular. É independente do
+fluxo de análise: não usa banco, sessão nem variáveis de ambiente próprias e é gerada de forma estática no build
+(servida pronta pela CDN, sem esperar servidor). O restante do site não muda.
 
 - **Rodar localmente:** `npm install` e `npm run dev`, depois `http://localhost:3000/kit-de-natal` (esta página não
   precisa do PostgreSQL).
@@ -416,7 +418,9 @@ estática no build (servida pronta pela CDN, sem esperar servidor). O restante d
 | Imagens | `public/images/` (mesmos nomes de arquivo) |
 | Seções e visual | `components/natal/` (página em `app/kit-de-natal/page.tsx`, cores em `app/globals.css`) |
 
-**Checkout e tráfego pago.** Os links estão como `#` até serem configurados. Cada botão tem `data-checkout` (`kit`,
+**Checkout e tráfego pago.** Os links estão como `#` até serem configurados. O botão principal e a barra fixa usam o
+link da opção marcada no seletor (o Kit Completo vem marcado; ao trocar de opção, mudam o preço, a imagem da galeria e
+o texto do botão). Cada botão tem `data-checkout` (`kit`,
 `arvore`, `pisca`, `acessorios`) e `data-placement` (onde fica na página), úteis para eventos no pixel ou no Gerenciador
 de Tags. Com links externos (https), a página repassa ao checkout os parâmetros de campanha da URL (`utm_*`, `src`,
 `sck`, `fbclid`, `gclid`, `gbraid`, `wbraid`, `ttclid`, `msclkid`), sem sobrescrever os que o link já tiver.
@@ -428,11 +432,11 @@ recortada nas bordas, nunca esticada nem colocada sobre textos; mantenha o produ
 
 | Arquivo | Onde aparece | Proporção (sugestão) |
 |---|---|---|
-| `hero-kit-natal.webp` | topo (árvore montada e decorada) e card do kit | 1:1 (1200×1200) |
-| `kit-completo.webp` | galeria do topo e "O que chega na sua casa" | 1:1 (1200×1200) |
-| `arvore-150cm.webp`, `pisca-pisca-led.webp`, `acessorios-natal.webp` | galeria, "Seu Natal completo" e compra separada | 1:1 (1000×1000) |
-| `embalagem-kit.webp` | embalagem | 4:3 (1200×900) |
-| `natal-ambiente.webp` | "Imagine sua casa assim" | 16:10 (1600×1000) |
+| `hero-kit-natal.webp` | primeira imagem da galeria (árvore montada e decorada) | 1:1 (1200×1200) |
+| `kit-completo.webp` | galeria e opção "Kit Completo" do seletor | 1:1 (1200×1200) |
+| `arvore-150cm.webp`, `pisca-pisca-led.webp`, `acessorios-natal.webp` | galeria, opções do seletor e "Seu Natal completo" | 1:1 (1000×1000) |
+| `embalagem-kit.webp` | "Preparado com cuidado para chegar até você" | 4:3 (1200×900) |
+| `natal-ambiente.webp` | "Imagine sua casa assim neste Natal" | 16:10 (1600×1000) |
 
 **Avaliações.** São 20 cards provisórios ("AVALIAÇÃO REAL SERÁ INSERIDA AQUI"), marcados no código como
 `PLACEHOLDER`. Para cada avaliação real, preencha `name`, `rating` (1 a 5) e `text` e, se houver, `date`
@@ -447,7 +451,7 @@ aparecem como "a informar" até serem preenchidos em `PRE_SALE` (`lib/natal/stor
 
 **Antes de publicar a página:**
 
-- [ ] Links reais nas 4 constantes de `lib/natal/checkout.ts` e uma compra de teste por botão.
+- [ ] Links reais nas 4 constantes de `lib/natal/checkout.ts` e uma compra de teste em cada opção do seletor.
 - [ ] Fotos reais nos 7 arquivos de `public/images/` (hoje são ilustrações).
 - [ ] Avaliações reais em `lib/natal/reviews.ts`.
 - [ ] Dados da empresa, links das políticas (hoje `#`), prazos da pré-venda e rastreamento em `lib/natal/store.ts`. O
