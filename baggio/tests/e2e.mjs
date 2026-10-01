@@ -122,7 +122,7 @@ await check("02 celular: primeira tela mostra foto, preço, desconto e barra com
   assert.equal(await text(page, "#preco .price__value"), "R$ 29,90");
   assert.equal(await text(page, "#preco s"), "R$ 40,90");
   assert.equal(await text(page, "#preco .off"), "-26%");
-  assert.match(await text(page, "#preco"), /🔥 PROMOÇÃO De R\$ 40,90 -26% Por R\$ 29,90 1 pacote de 250g · Você economiza R\$ 11,00/);
+  assert.match(await text(page, "#preco"), /🔥 PROMOÇÃO De R\$ 40,90 -26% Por R\$ 29,90 1 pacote de 250g moído · Você economiza R\$ 11,00/);
   assert.match(await text(page, "#faixa"), /🔥 PROMOÇÃO: 250g por R\$ 29,90 · 500g por R\$ 39,90/);
   assert.ok(await barVisible(page), "barra fixa deve aparecer de início no celular");
   assert.equal(await text(page, "[data-bar-value]"), "R$ 29,90");
@@ -146,9 +146,9 @@ await check("03 seleção de kit, preços da promoção (De/Por) e kits sem pre�
   // Kits de 2 e 3 pacotes estão sem preço (active: false): nem aparecem, nem em "Ver mais opções"
   assert.equal(await page.locator('#ofertas [data-action="more-toggle"]').count(), 0);
   assert.equal(await page.locator('#ofertas input[value="2x250"], #ofertas input[value="3x250"]').count(), 0);
-  assert.match(await text(page, "#ofertas .promo-box"), /🔥 PROMOÇÃO Pacote de 250g: de R\$ 40,90 por R\$ 29,90 Pacote de 500g: de R\$ 75,00 por R\$ 39,90/);
-  assert.match(await text(page, "#ofertas .opt.is-selected"), /^1 pacote 250g -26% Economize R\$ 11,00 De R\$ 40,90 Por R\$ 29,90 Frete grátis$/);
-  assert.match(await text(page, '#ofertas label:has(input[value="1x500"])'), /^1 pacote 500g -46% Economize R\$ 35,10 De R\$ 75,00 Por R\$ 39,90 Frete grátis$/);
+  assert.match(await text(page, "#ofertas .promo-box"), /🔥 PROMOÇÃO Pacote de 250g moído: de R\$ 40,90 por R\$ 29,90 Pacote de 500g em grãos \(Bourbon e Espresso\): de R\$ 75,00 por R\$ 39,90/);
+  assert.match(await text(page, "#ofertas .opt.is-selected"), /^1 pacote 250g moído -26% Economize R\$ 11,00 De R\$ 40,90 Por R\$ 29,90 Frete grátis$/);
+  assert.match(await text(page, '#ofertas label:has(input[value="1x500"])'), /^1 pacote 500g em grãos -46% Economize R\$ 35,10 De R\$ 75,00 Por R\$ 39,90 Frete grátis$/);
   assert.match(await text(page, '#ofertas label:has(input[value="1kg"])'), /1KG MELHOR OFERTA 4×250g ou 2×500g até -57% Economize até R\$ 93,70 R\$ 69,90 2 opções/);
 
   assert.equal(await page.locator("#montar .slot").count(), 0, "1 pacote: sem pacotes para montar");
@@ -156,18 +156,21 @@ await check("03 seleção de kit, preços da promoção (De/Por) e kits sem pre�
 
   await page.locator('#ofertas label:has(input[value="1x500"])').click();
   assert.equal(await text(page, "#preco .price__value"), "R$ 39,90");
-  assert.match(await text(page, "#preco"), /🔥 PROMOÇÃO De R\$ 75,00 -46% Por R\$ 39,90 1 pacote de 500g · Você economiza R\$ 35,10/);
+  assert.match(await text(page, "#preco"), /🔥 PROMOÇÃO De R\$ 75,00 -46% Por R\$ 39,90 1 pacote de 500g em grãos · Você economiza R\$ 35,10/);
+  // 500g: só Bourbon e Espresso (em grãos), como no site oficial
+  assert.deepEqual(await page.locator("#montar .flavor").evaluateAll((els) => els.map((e) => e.getAttribute("data-flavor"))), ["bourbon", "espresso"]);
   assert.ok((await page.locator("#montar .flavor__meta").allInnerTexts()).every((m) => m === "500g"));
+  assert.equal(await text(page, "#montar .block__aside"), "1 pacote de 500g em grãos");
 
   await page.locator('#ofertas label:has(input[value="1kg"])').click();
   assert.equal(await page.locator("#ofertas .kg").count(), 2, "1KG abre Kit Variedade e Kit Favoritos");
   const kg = await text(page, "#ofertas .kgs");
-  assert.match(kg, /KIT VARIEDADE 4 pacotes de 250g Total: 1kg R\$ 69,90 R\$ 163,60 -57% Ideal para experimentar mais sabores\. MONTAR KIT/);
-  assert.match(kg, /KIT FAVORITOS 2 pacotes de 500g Total: 1kg R\$ 69,90 R\$ 150,00 -53% Mais quantidade dos sabores que você já ama\. ESCOLHER SABORES/);
+  assert.match(kg, /KIT VARIEDADE 4 pacotes de 250g moído Total: 1kg R\$ 69,90 R\$ 163,60 -57% Ideal para experimentar mais sabores\. MONTAR KIT/);
+  assert.match(kg, /KIT FAVORITOS 2 pacotes de 500g em grãos Bourbon e Espresso Total: 1kg R\$ 69,90 R\$ 150,00 -53% Mais quantidade dos sabores que você já ama\. ESCOLHER SABORES/);
   assert.match(kg, /As duas opções têm 1kg e o mesmo preço\./);
   // "De" dos kits = pacotes × preço normal do mesmo tamanho (4 × R$ 40,90 e 2 × R$ 75,00)
   await page.locator('#ofertas .kg [data-offer="2x500"]').click();
-  assert.match(await text(page, "#preco"), /De R\$ 150,00 -53% Por R\$ 69,90 R\$ 34,95 por pacote Kit Favoritos · 2 pacotes de 500g · 1kg · Você economiza R\$ 80,10/);
+  assert.match(await text(page, "#preco"), /De R\$ 150,00 -53% Por R\$ 69,90 R\$ 34,95 por pacote Kit Favoritos · 2 pacotes de 500g em grãos · 1kg · Você economiza R\$ 80,10/);
   await page.locator('#ofertas .kg [data-offer="4x250"]').click();
   await shot(page, "m-1kg");
   assert.deepEqual(page.errors, []);
@@ -178,7 +181,7 @@ await check("04-06 sabores: escolher, repetir, trocar, progresso e kit pronto", 
   const { ctx, page } = await open(MOBILE);
   // 1 pacote: tocar em outro sabor troca o sabor escolhido
   await pickFlavors(page, ["baunilha"]);
-  assert.match(await text(page, "#resumo"), /1 pacote — 250g 1× Baunilha 250g/);
+  assert.match(await text(page, "#resumo"), /1 pacote — 250g moído 1× Baunilha 250g/);
   assert.equal(await text(page, "[data-bar-btn]"), "COMPRAR AGORA");
   await pickFlavors(page, ["espresso"]);
   assert.match(await text(page, "#resumo"), /1× Espresso 250g/);
@@ -234,10 +237,10 @@ await check("07-09 kit 4×250g: preço, economia e resumo calculados do valor un
   await page.locator('#ofertas label:has(input[value="1kg"])').click();
   await page.locator('#ofertas .kg [data-offer="4x250"]').click();
   assert.equal(await page.locator("#montar .slot").count(), 4);
-  assert.match(await text(page, "#preco"), /🔥 PROMOÇÃO De R\$ 163,60 -57% Por R\$ 69,90 ≈ R\$ 17,47 por pacote Kit Variedade · 4 pacotes de 250g · 1kg · Você economiza R\$ 93,70/);
+  assert.match(await text(page, "#preco"), /🔥 PROMOÇÃO De R\$ 163,60 -57% Por R\$ 69,90 ≈ R\$ 17,47 por pacote Kit Variedade · 4 pacotes de 250g moído · 1kg · Você economiza R\$ 93,70/);
   await pickFlavors(page, ["caramelo", "chocolate-com-avela", "caramelo", "bourbon"]);
   const resumo = await text(page, "#resumo");
-  assert.match(resumo, /SEU KIT Kit Variedade — 4×250g 2× Caramelo 250g 1× Chocolate com Avelã 250g 1× Bourbon 250g/);
+  assert.match(resumo, /SEU KIT Kit Variedade — 4×250g moído 2× Caramelo 250g 1× Chocolate com Avelã 250g 1× Bourbon 250g/);
   assert.match(resumo, /Total 1kg \(4 pacotes\) De R\$ 163,60 Por R\$ 69,90 Você economiza R\$ 93,70/);
   assert.match(resumo, /Entrega PAC \(até 10 dias úteis\) GRÁTIS TOTAL R\$ 69,90 🚚 Frete grátis disponível COMPRAR AGORA/);
   await ctx.close();
@@ -251,15 +254,20 @@ await check("10-11 kit 2×500g e pesos nunca misturados", async () => {
   await page.locator('#ofertas .kg [data-offer="2x500"]').click();
   assert.equal(await page.locator("#montar .slot").count(), 2);
   const metas = await page.locator("#montar .flavor__meta").allInnerTexts();
-  assert.ok(metas.every((m) => m === "500g"), "todos os cards mostram 500g: " + metas.join(","));
+  assert.deepEqual(metas, ["500g", "500g"], "500g: só Bourbon e Espresso");
+  // Baunilha não existe em 500g: o 2º pacote fica para escolher
+  assert.match(await text(page, "#montar [data-progress]"), /1 de 2 sabores escolhidos/);
+  await pickFlavors(page, ["bourbon"]);
   assert.match(await text(page, "#montar [data-progress]"), /Seu kit está pronto ✓/);
   const result = await order(page);
   assert.equal(result.order.tipoKit, "2x500g");
+  assert.equal(result.order.kit.moagem, "em grãos");
   assert.ok(result.order.itens.every((i) => i.peso === 500));
-  assert.deepEqual(result.order.itens.map((i) => i.sabor), ["Espresso", "Baunilha"]);
-  // Volta para 4×250g: os sabores voltam (inclusive o 3º, guardado)
+  assert.deepEqual(result.order.itens.map((i) => i.sabor), ["Espresso", "Bourbon"]);
+  // Volta para 4×250g: o 3º sabor guardado volta
   await page.locator('#ofertas .kg [data-offer="4x250"]').click();
   assert.match(await text(page, "#montar [data-progress]"), /3 de 4 sabores escolhidos/);
+  assert.match(await text(page, "#resumo"), /1× Espresso 250g 1× Bourbon 250g 1× Caramelo 250g/);
   assert.ok((await page.locator("#montar .flavor__meta").allInnerTexts()).every((m) => m === "250g"));
   await ctx.close();
 });
@@ -353,7 +361,7 @@ await check("17-18 carrinho e resumo antes do checkout (editar, trocar kit, entr
   await page.locator("#cta-principal").click();
   await page.waitForTimeout(300);
   const cart = await text(page, "#carrinho");
-  assert.match(cart, /SEU PEDIDO Kit Variedade — 4×250g Total: 1kg · 4 pacotes de 250g 2× Caramelo 250g 1× Chocolate com Avelã 250g 1× Bourbon 250g/);
+  assert.match(cart, /SEU PEDIDO Kit Variedade — 4×250g moído Total: 1kg · 4 pacotes de 250g 2× Caramelo 250g 1× Chocolate com Avelã 250g 1× Bourbon 250g/);
   assert.match(cart, /R\$ 163,60 R\$ 69,90 Editar sabores/);
   assert.match(cart, /Preço normal \(4 pacotes\) R\$ 163,60 Desconto da promoção - R\$ 93,70 Produtos R\$ 69,90 Entrega PAC GRÁTIS Prazo até 10 dias úteis TOTAL R\$ 69,90/);
   assert.match(cart, /FINALIZAR COMPRA/);
@@ -368,7 +376,7 @@ await check("17-18 carrinho e resumo antes do checkout (editar, trocar kit, entr
   const chips = await page.locator("#carrinho .switch [data-offer]").evaluateAll((els) => els.map((e) => e.getAttribute("data-offer")));
   assert.deepEqual(chips.sort(), ["1x250", "1x500", "2x500", "4x250"]);
   await page.locator('#carrinho .switch [data-offer="1x250"]').click();
-  assert.match(await text(page, "#carrinho .citem"), /1 pacote — 250g 1 pacote de 250g 1× Caramelo 250g/);
+  assert.match(await text(page, "#carrinho .citem"), /1 pacote — 250g moído 1 pacote de 250g 1× Caramelo 250g/);
   assert.match(await text(page, "#carrinho"), /Preço normal \(1 pacote\) R\$ 40,90 Desconto da promoção - R\$ 11,00 Produtos R\$ 29,90 Entrega SEDEX R\$ 15,00 Prazo até 5 dias úteis TOTAL R\$ 44,90/);
   await page.locator('#carrinho .switch [data-offer="4x250"]').click();
   assert.match(await text(page, "#carrinho .citem"), /2× Caramelo 250g 1× Chocolate com Avelã 250g 1× Bourbon 250g/);
@@ -582,7 +590,7 @@ await check("24 checkout (demonstração): valida, preserva tudo e monta o objet
   await page.waitForTimeout(300);
   const done = await text(page, "#carrinho");
   assert.match(done, /Pedido pronto para o pagamento Pedido BG-\d{6}-[A-Z0-9]{4}/);
-  assert.match(done, /Kit Variedade — 4×250g 2× Caramelo 250g 1× Bourbon 250g 1× Chocolate com Avelã 250g Produtos R\$ 69,90 Entrega SEDEX R\$ 15,00 Prazo até 5 dias úteis TOTAL R\$ 84,90/);
+  assert.match(done, /Kit Variedade — 4×250g moído 2× Caramelo 250g 1× Bourbon 250g 1× Chocolate com Avelã 250g Produtos R\$ 69,90 Entrega SEDEX R\$ 15,00 Prazo até 5 dias úteis TOTAL R\$ 84,90/);
   const last = await page.evaluate(() => window.BaggioStore.lastOrder);
   assert.equal(last.tipoKit, "4x250g");
   assert.deepEqual(last.itens.map((i) => [i.sabor, i.peso, i.quantidade]), [["Caramelo", 250, 2], ["Bourbon", 250, 1], ["Chocolate com Avelã", 250, 1]]);
@@ -648,7 +656,7 @@ await check("24 checkout pelo WhatsApp monta a mensagem do pedido", async () => 
   assert.match(page.url(), /index\.html/, "a loja continua aberta na aba atual");
   assert.match(opened[0].u, /^https:\/\/wa\.me\/5511900000000\?text=/);
   const msg = decodeURIComponent(opened[0].u.split("text=")[1]).replace(/\u00a0/g, " ");
-  assert.match(msg, /\*Kit Favoritos — 2×500g \(1kg\)\*\n• 1× Bourbon 500g\n• 1× Espresso 500g/);
+  assert.match(msg, /\*Kit Favoritos — 2×500g em grãos \(1kg\)\*\n• 1× Bourbon 500g\n• 1× Espresso 500g/);
   assert.match(msg, /\*Total: R\$ 69,90\*/);
   await ctx.close();
 });
@@ -657,11 +665,11 @@ await check("24 validação: não chega ao checkout sem todos os sabores", async
   // Trocar de peso pelo carrinho recria os pacotes no peso novo, mantendo os sabores que cabem
   const { ctx, page } = await open(MOBILE);
   await page.locator('#ofertas label:has(input[value="1kg"])').click();
-  await pickFlavors(page, ["caramelo", "bourbon", "espresso", "baunilha"]);
+  await pickFlavors(page, ["espresso", "bourbon", "caramelo", "baunilha"]);
   await page.locator("#cta-principal").click();
   await page.locator('#carrinho [data-action="cart-switch"]').click();
   await page.locator('#carrinho .switch [data-offer="2x500"]').click();
-  assert.match(await text(page, "#carrinho .citem"), /Kit Favoritos — 2×500g .* 1× Caramelo 500g 1× Bourbon 500g/);
+  assert.match(await text(page, "#carrinho .citem"), /Kit Favoritos — 2×500g em grãos .* 1× Espresso 500g 1× Bourbon 500g/);
   assert.equal(await page.locator('#carrinho [data-action="checkout"]').count(), 1);
   await ctx.close();
 
@@ -709,7 +717,7 @@ await check("analytics: eventos preparados (view_item … begin_checkout) e purc
   assert.equal(begin.ecommerce.items[1].item_id, "copinho-cookie-cacau");
   // Página de retorno do checkout
   await page.goto(url + "/obrigado.html", { waitUntil: "networkidle" });
-  assert.match(await text(page, "#obrigado"), /Pedido recebido! .* Kit Variedade — 4×250g 2× Caramelo 250g 1× Bourbon 250g 1× Espresso 250g 1× Copinho de Cookie sabor Cacau — 68g .* TOTAL R\$ 94,89/);
+  assert.match(await text(page, "#obrigado"), /Pedido recebido! .* Kit Variedade — 4×250g moído 2× Caramelo 250g 1× Bourbon 250g 1× Espresso 250g 1× Copinho de Cookie sabor Cacau — 68g .* TOTAL R\$ 94,89/);
   const purchases = await page.evaluate(() => window.dataLayer.filter((e) => e.event === "purchase"));
   assert.equal(purchases.length, 1);
   assert.equal(purchases[0].ecommerce.value, 94.89);
@@ -726,11 +734,11 @@ await check("persistência: recarregar a página mantém kit, sabores, entrega e
   const { ctx, page } = await open(MOBILE);
   await page.locator('#ofertas label:has(input[value="1kg"])').click();
   await page.locator('#ofertas .kg [data-offer="2x500"]').click();
-  await pickFlavors(page, ["baunilha", "bourbon"]);
+  await pickFlavors(page, ["espresso", "bourbon"]);
   await page.locator('#entrega label:has(input[value="sedex"])').click();
   await page.locator("#cta-principal").click();
   await page.reload({ waitUntil: "networkidle" });
-  assert.match(await text(page, "#resumo"), /1× Baunilha 500g 1× Bourbon 500g .* TOTAL R\$ 84,90/);
+  assert.match(await text(page, "#resumo"), /1× Espresso 500g 1× Bourbon 500g .* TOTAL R\$ 84,90/);
   assert.equal(await text(page, "#carrinho-qtd"), "2");
   await page.goto(url + "/index.html?kit=4x250", { waitUntil: "networkidle" });
   assert.match(await text(page, "#montar [data-progress]"), /2 de 4 sabores escolhidos/);
@@ -832,7 +840,7 @@ await check("fotos oficiais (cada peso com a sua foto) e 'Conheça os sabores' c
   await avela.locator("summary").click();
   assert.match(nb(await avela.innerText()), /Sabor equilibrado e intensidade média.*Combina com: Sobremesas e finalizações/);
   assert.match(await text(page, '#sabores .flavinfo__item[data-flavor="bourbon"] summary'), /^Bourbon 🏅 BLEND PREMIADO Encorpado, doce, com notas de chocolate\.$/);
-  assert.match(await text(page, "#sabores .specs"), /Qualidade: Pontuação acima de 85 .*Origem: Mogiana Paulista e Sul de Minas \(Espresso: Cerrado Mineiro\)/);
+  assert.match(await text(page, "#sabores .specs"), /Pacotes de 250g: Café torrado e moído \(moagem média\), nos 7 sabores; pontuação acima de 85 Pacotes de 500g: Bourbon e Espresso em grãos, para moer na hora; pontuação acima de 84 Origem: Mogiana Paulista e Sul de Minas \(Espresso: Cerrado Mineiro\)/);
   assert.match(await text(page, "#sabores .about__source"), /site oficial da Baggio Café/);
   assert.deepEqual(page.errors, []);
   await ctx.close();
@@ -844,11 +852,11 @@ await check("desktop: layout em duas colunas, galeria fixa e barra com resumo do
   const b = await page.locator("#info").boundingBox();
   assert.ok(b.x > g.x + g.width - 1, "informações à direita da galeria");
   assert.ok(await barVisible(page));
-  assert.match(await text(page, "[data-bar-kit]"), /^1 pacote — 250g — 0 de 1 sabor$/);
+  assert.match(await text(page, "[data-bar-kit]"), /^1 pacote — 250g moído — 0 de 1 sabor$/);
   await page.locator('#ofertas label:has(input[value="1kg"])').click();
-  assert.match(await text(page, "[data-bar-kit]"), /^Kit Variedade — 4×250g — 0 de 4 sabores$/);
+  assert.match(await text(page, "[data-bar-kit]"), /^Kit Variedade — 4×250g moído — 0 de 4 sabores$/);
   await pickFlavors(page, ["caramelo", "bourbon", "espresso", "caramelo"]);
-  assert.match(await text(page, "[data-bar-kit]"), /^Kit Variedade — 4×250g — 2× Caramelo, 1× Bourbon, 1× Espresso$/);
+  assert.match(await text(page, "[data-bar-kit]"), /^Kit Variedade — 4×250g moído — 2× Caramelo, 1× Bourbon, 1× Espresso$/);
   assert.equal(await text(page, "[data-bar-value]"), "R$ 69,90");
   await shot(page, "d-fold");
   await page.locator("#cta-principal").click();

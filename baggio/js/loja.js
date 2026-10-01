@@ -184,6 +184,15 @@
   const orderInput = () => ({ offerId: state.selection.offerId, slots: state.selection.slots, shippingId: state.shippingId, extras: state.extras });
   const totals = () => core.computeTotals(catalog, orderInput());
   const flavorImage = (flavor, size) => (size === 500 && flavor.image500) || flavor.image;
+  /** Sabores que existem neste peso (ex.: 500g só Bourbon e Espresso). */
+  const flavorsForSize = (size) => catalog.flavors.filter((f) => f.sizes.indexOf(size) !== -1);
+  /** "Bourbon e Espresso" quando só alguns sabores existem no peso; vazio quando todos existem. */
+  const sizeFlavorsText = (size) => {
+    const list = flavorsForSize(size);
+    if (list.length === catalog.flavors.length) return "";
+    const names = list.map((f) => f.name);
+    return names.length > 1 ? names.slice(0, -1).join(", ") + " e " + names[names.length - 1] : names.join("");
+  };
   const perPack = (o) => (o.perPackExact ? "" : "≈ ") + money(o.perPackCents);
   const badgeClass = (text) => (/VENDIDO/i.test(text) ? "badge--hot" : "badge--best");
   const extrasCount = () => Object.keys(state.extras).reduce((sum, id) => sum + (state.extras[id] || 0), 0);
@@ -526,7 +535,7 @@
       esc(o.packs === 1 ? "1 pacote" : o.name) +
       (o.badge ? ' <span class="badge ' + badgeClass(o.badge) + '">' + esc(o.badge) + "</span>" : "") +
       '</span><span class="opt__sub">' +
-      esc(o.packs === 1 ? o.size + "g" : o.detail) +
+      esc(o.packs === 1 ? o.size + "g" + (o.grind ? " " + o.grind : "") : o.detail) +
       (o.discountPercent ? ' <span class="off off--sm">-' + o.discountPercent + "%</span>" : "") +
       "</span>" +
       (o.savingsCents > 0 ? '<span class="opt__save">Economize ' + money(o.savingsCents) + "</span>" : "") +
@@ -556,6 +565,7 @@
           '<p class="kg__packs">' +
           esc(o.detail) +
           "</p>" +
+          (sizeFlavorsText(o.size) ? '<p class="kg__flavors">' + esc(sizeFlavorsText(o.size)) + "</p>" : "") +
           '<p class="kg__total">Total: <b>' +
           core.formatWeight(o.totalGrams) +
           "</b></p>" +
@@ -638,7 +648,10 @@
           (p) =>
             "<li>Pacote de " +
             p.size +
-            "g: de <s>" +
+            "g" +
+            (catalog.grindBySize[p.size] ? " " + esc(catalog.grindBySize[p.size]) : "") +
+            (sizeFlavorsText(p.size) ? " (" + esc(sizeFlavorsText(p.size)) + ")" : "") +
+            ": de <s>" +
             money(p.regularCents) +
             "</s> por <b>" +
             money(p.priceCents) +
@@ -745,7 +758,7 @@
         }
         slots = '<div class="slots" style="--n:' + o.packs + '">' + slots + "</div>";
       }
-      const cards = catalog.flavors
+      const cards = flavorsForSize(o.size)
         .map((f) => {
           const fits = core.flavorFits(catalog, f.id, o.size);
           return (
@@ -775,7 +788,7 @@
         '<div class="block__head"><h2 class="block__title" id="montar-titulo">' +
         (single ? "ESCOLHA SEU SABOR" : "MONTE SEU KIT") +
         '</h2><span class="block__aside">' +
-        esc(single ? o.detail : o.name + " · " + o.kitLabel) +
+        esc(single ? o.detail : o.name + " · " + o.kitLabel + (o.grind ? " " + o.grind : "")) +
         "</span></div>" +
         (single
           ? ""
@@ -1917,6 +1930,8 @@
           " " +
           core.formatWeight(o.totalGrams) +
           " total</li>" +
+          (o.grind ? "<li>" + ICON.check + " Café " + esc(o.grind) + "</li>" : "") +
+          (sizeFlavorsText(o.size) ? "<li>" + ICON.check + " " + esc(sizeFlavorsText(o.size)) + "</li>" : "") +
           (freeShipping ? "<li>" + ICON.check + " " + esc(freeShipping.name) + " grátis</li>" : "") +
           '</ul><p class="cmp__price">' +
           money(o.priceCents) +

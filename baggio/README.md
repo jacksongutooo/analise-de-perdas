@@ -12,6 +12,9 @@ estática.
 
 - **Fotos oficiais da Baggio** (do site baggiocafe.com.br), padronizadas: fundo branco, quadradas, cada pacote
   na mesma proporção e na gramagem certa (250g; Bourbon e Espresso também em 500g).
+- **Moagem junto do peso, como no site oficial:** os 7 sabores em **250g moído**; **500g em grãos** só de
+  **Bourbon e Espresso**. Aparece nas opções, no quadro da promoção, nos kits, no carrinho e no pedido
+  ("1 pacote — 500g em grãos"). No 500g, a escolha de sabor mostra só Bourbon e Espresso.
 - **Primeira dobra de marketplace:** galeria (deslizar no celular, miniaturas no computador, foto ampliada ao
   tocar), selo 🔥 PROMOÇÃO, preço normal riscado, desconto, preço grande, preço por pacote, economia, frete
   grátis, estrelas, "Ver avaliações", "+7.000 pacotes vendidos" e os selos "Café especial · 100% arábica ·
@@ -19,9 +22,9 @@ estática.
 - **Promoção bem clara:** a faixa do topo avisa "🔥 PROMOÇÃO: 250g por R$ 29,90 · 500g por R$ 39,90" e, logo
   acima dos kits, um quadro mostra "Pacote de 250g: de ~~R$ 40,90~~ por R$ 29,90" e "Pacote de 500g: de
   ~~R$ 75,00~~ por R$ 39,90". Todos os preços aparecem como "De (riscado) / Por".
-- **Escolha do kit sem confusão:** de cara só aparecem *1 pacote de 250g*, *1 pacote de 500g* e *1KG (MELHOR
-  OFERTA)*. O 1KG abre *Kit Variedade (4×250g)* e *Kit Favoritos (2×500g)*, com o aviso de que os dois têm 1kg e
-  o mesmo preço. Uma sugestão calculada mostra quanto falta para o kit de 1kg ("Por + R$ 40,00 leve 4
+- **Escolha do kit sem confusão:** de cara só aparecem *1 pacote de 250g moído*, *1 pacote de 500g em grãos* e
+  *1KG (MELHOR OFERTA)*. O 1KG abre *Kit Variedade (4×250g moído)* e *Kit Favoritos (2×500g em grãos, Bourbon e
+  Espresso)*, com o aviso de que os dois têm 1kg e o mesmo preço. Uma sugestão calculada mostra quanto falta para o kit de 1kg ("Por + R$ 40,00 leve 4
   pacotes (1kg): ≈ R$ 17,47 cada").
 - **Monte seu kit:** pacotes numerados com a foto do sabor escolhido e cards de sabor com foto, nome, peso,
   borda de destaque e ✓ (ou 2×, 3×…). No pacote avulso é só tocar no sabor (tocar em outro troca). Nos kits dá
@@ -60,7 +63,8 @@ Quase tudo fica em **`js/config.js`**. Nenhum preço está digitado em outro arq
 | Promoção (selo, quadro e faixa do topo) | `js/config.js` → `PROMO` |
 | Preço do copinho de cookie (R$ 9,99, vale para os dois sabores) | `js/config.js` → `COOKIE_PRICE` |
 | Copinho de cookie e outros sabores do biscoito xícara | `js/config.js` → `EXTRAS` |
-| Sabores (adicionar, remover, esgotado, Blend Premiado, fotos) | `js/config.js` → `FLAVORS` |
+| Sabores (adicionar, remover, esgotado, Blend Premiado, fotos, pesos em que existe) | `js/config.js` → `FLAVORS` |
+| Moagem de cada peso ("250g moído", "500g em grãos") | `js/config.js` → `GRIND` |
 | Descrição de cada sabor (notas, com o que combina, origem) | `js/config.js` → `FLAVORS` |
 | "Conheça os sabores" (título, ficha técnica, fonte) | `js/config.js` → `ABOUT` |
 | Kits, selos, kits ligados/desligados e o que aparece de cara | `js/config.js` → `OFFERS` e `OFFER_MENU` |
@@ -120,9 +124,10 @@ formato quadrado, o produto sempre centralizado e na mesma proporção, em WebP 
 | Fotos dos clientes | `img/avaliacoes/` | `js/reviews.js` → `images` | até 1080px no lado maior |
 | Logo (opcional) | `img/` | `STORE` → `logo` | SVG ou PNG com 64px de altura |
 
-**Pacotes de 500g:** no site oficial só existem Bourbon e Espresso em 500g (e em grãos). Os outros sabores, quando
-escolhidos em 500g, mostram a foto do pacote de 250g até existir a foto oficial de 500g (`image500`). Se um sabor
-não existir em 500g, use `sizes: [250]` nele.
+**Pacotes de 500g:** como no site oficial, só Bourbon e Espresso existem em 500g, em grãos. Os 5 aromatizados
+têm `sizes: [250]` em `FLAVORS`, então não aparecem quando o cliente escolhe 500g (e um sabor escolhido no 250g
+fica guardado e volta se ele voltar ao 250g). Para um sabor passar a existir em 500g, apague o `sizes: [250]`
+dele e coloque a foto do pacote de 500g em `image500`.
 
 Para trocar ou adicionar uma foto, salve o arquivo na pasta indicada e mude o caminho em `js/config.js`. Use WebP
 ou JPG comprimido (ideal: menos de 150 KB por foto da galeria e menos de 60 KB por foto de sabor). A primeira foto
@@ -190,8 +195,8 @@ Objeto do pedido (também salvo no navegador como `baggio:ultimo-pedido`):
 {
   id: "BG-261001-K7QX",
   tipoKit: "4x250g",
-  kit: { id: "4x250", nome: "Kit Variedade", descricao: "Kit Variedade — 4×250g", pacotes: 4,
-         pesoPacote: 250, pesoTotal: 1000, preco: 69.9, precoNormal: 163.6, economia: 93.7 },
+  kit: { id: "4x250", nome: "Kit Variedade", descricao: "Kit Variedade — 4×250g moído", pacotes: 4,
+         pesoPacote: 250, pesoTotal: 1000, moagem: "moído", preco: 69.9, precoNormal: 163.6, economia: 93.7 },
   itens: [
     { sabor: "Caramelo", saborId: "caramelo", peso: 250, quantidade: 2 },
     { sabor: "Bourbon", saborId: "bourbon", peso: 250, quantidade: 1 },
@@ -249,7 +254,6 @@ na primeira visita, sem contar as fotos oficiais.
 
 ## Antes de publicar
 
-- [ ] Confirmar quais sabores você vende em 500g (no site oficial só há Bourbon e Espresso, em grãos).
 - [ ] Preços do Kit com 2 e do Kit com 3, se forem voltar (hoje desligados).
 - [ ] Avaliações reais em `js/reviews.js` (ou `showPlaceholders: false`).
 - [ ] `CHECKOUT` configurado (`"link"` ou `"whatsapp"`); no modo `"demo"` o cliente não chega ao pagamento.
@@ -265,8 +269,9 @@ node --test baggio/tests/core.test.js
 ```
 
 Esse comando não precisa instalar nada. Ele confere preços, preço por pacote, economia, descontos, kits sem
-mistura de pesos, preço normal × promoção, kits desligados, troca de kit preservando sabores, frete, copinho
-de cookie, objeto do pedido, link do checkout, mensagem do WhatsApp e as contas das avaliações.
+mistura de pesos, 500g só de Bourbon e Espresso (em grãos), preço normal × promoção, kits desligados, troca de
+kit preservando sabores, frete, copinho de cookie, objeto do pedido, link do checkout, mensagem do WhatsApp e as
+contas das avaliações.
 
 Teste de ponta a ponta no navegador (Chromium, celular e computador; precisa do Playwright):
 

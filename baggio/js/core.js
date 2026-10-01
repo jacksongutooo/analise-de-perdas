@@ -75,6 +75,7 @@
       else regularBySize[m[2]] = cents;
     });
 
+    var grindBySize = config.grind || {}; // "250": "moído", "500": "em grãos"
     var offers = [];
     var offerById = {};
     (config.offers || []).forEach(function (o) {
@@ -94,6 +95,8 @@
       var referenceCents = regularUnitCents * packs;
       var savingsCents = Math.max(0, referenceCents - priceCents);
       var kitLabel = packs + "×" + size + "g";
+      var grind = grindBySize[size] ? String(grindBySize[size]) : "";
+      var withGrind = grind ? " " + grind : ""; // "250g moído", "500g em grãos"
       var offer = {
         id: String(o.id),
         size: size,
@@ -114,8 +117,9 @@
         totalGrams: size * packs,
         kitLabel: kitLabel, // "4×250g"
         tipoKit: packs + "x" + size + "g", // "4x250g" (objeto do pedido)
-        detail: packs === 1 ? "1 pacote de " + size + "g" : packs + " pacotes de " + size + "g",
-        displayName: packs === 1 ? "1 pacote — " + size + "g" : (o.name || "Kit") + " — " + kitLabel,
+        grind: grind,
+        detail: (packs === 1 ? "1 pacote de " : packs + " pacotes de ") + size + "g" + withGrind,
+        displayName: packs === 1 ? "1 pacote — " + size + "g" + withGrind : (o.name || "Kit") + " — " + kitLabel + withGrind,
       };
       if (offerById[offer.id]) {
         warn("Kit com id repetido: " + offer.id);
@@ -239,6 +243,7 @@
       sizes: sizes,
       unitBySize: unitBySize,
       regularBySize: regularBySize,
+      grindBySize: grindBySize,
       packPromos: packPromos,
       shipping: shipping,
       shippingById: shippingById,
@@ -496,6 +501,7 @@
         pacotes: offer.packs,
         pesoPacote: offer.size,
         pesoTotal: offer.totalGrams,
+        moagem: offer.grind, // "moído" ou "em grãos"
         preco: fromCents(offer.priceCents),
         precoNormal: fromCents(offer.referenceCents), // pacotes pelo preço normal (o "De")
         economia: fromCents(offer.savingsCents),

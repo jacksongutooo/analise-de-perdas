@@ -194,30 +194,45 @@ describe("monte seu kit", () => {
   });
 
   test("trocar de kit preserva os sabores e lembra os que não couberam", () => {
-    let s = pick(catalog, "4x250", ["caramelo", "bourbon", "espresso", "baunilha"]);
+    let s = pick(catalog, "4x250", ["bourbon", "espresso", "caramelo", "baunilha"]);
     s = core.changeOffer(catalog, s, "2x500");
-    assert.deepEqual(s.slots, ["caramelo", "bourbon"]);
+    assert.deepEqual(s.slots, ["bourbon", "espresso"]);
     s = core.changeOffer(catalog, s, "4x250");
-    assert.deepEqual(s.slots, ["caramelo", "bourbon", "espresso", "baunilha"]);
+    assert.deepEqual(s.slots, ["bourbon", "espresso", "caramelo", "baunilha"]);
     s = core.changeOffer(catalog, s, "1x250");
-    assert.deepEqual(s.slots, ["caramelo"]);
+    assert.deepEqual(s.slots, ["bourbon"]);
     s = core.changeOffer(catalog, s, "4x250");
-    assert.deepEqual(s.slots, ["caramelo", "bourbon", "espresso", "baunilha"]);
+    assert.deepEqual(s.slots, ["bourbon", "espresso", "caramelo", "baunilha"]);
   });
 
-  test("sabor indisponível ou de outro peso não entra no kit", () => {
+  test("sabor esgotado ou de outro peso não entra no kit", () => {
     const cat = withConfig((c) => {
-      c.flavors.find((f) => f.id === "baunilha").sizes = [250];
       c.flavors.find((f) => f.id === "espresso").available = false;
     });
-    let s = pick(cat, "4x250", ["baunilha", "caramelo"]);
-    assert.deepEqual(s.slots, ["baunilha", "caramelo", null, null]);
-    s = core.setSlot(cat, s, 2, "espresso");
+    let s = pick(cat, "4x250", ["baunilha", "bourbon"]);
+    assert.deepEqual(s.slots, ["baunilha", "bourbon", null, null]);
+    s = core.setSlot(cat, s, 2, "espresso"); // esgotado
     assert.equal(s.slots[2], null);
-    s = core.changeOffer(cat, s, "2x500");
-    assert.deepEqual(s.slots, [null, "caramelo"]);
+    s = core.changeOffer(cat, s, "2x500"); // Baunilha não existe em 500g
+    assert.deepEqual(s.slots, [null, "bourbon"]);
     s = core.setSlot(cat, s, 0, "baunilha");
     assert.equal(s.slots[0], null);
+  });
+
+  test("500g só de Bourbon e Espresso, em grãos; 250g moído em todos os sabores", () => {
+    assert.deepEqual(
+      catalog.flavors.filter((f) => f.sizes.includes(500)).map((f) => f.id),
+      ["bourbon", "espresso"],
+    );
+    assert.equal(catalog.flavors.filter((f) => f.sizes.includes(250)).length, 7);
+    assert.equal(offer("1x250").displayName, "1 pacote — 250g moído");
+    assert.equal(offer("1x500").displayName, "1 pacote — 500g em grãos");
+    assert.equal(offer("4x250").detail, "4 pacotes de 250g moído");
+    assert.equal(offer("2x500").displayName, "Kit Favoritos — 2×500g em grãos");
+    let s = pick(catalog, "1x500", ["caramelo"]);
+    assert.deepEqual(s.slots, [null], "aromatizado não entra no 500g");
+    s = core.setSlot(catalog, s, 0, "espresso");
+    assert.deepEqual(s.slots, ["espresso"]);
   });
 });
 
@@ -234,23 +249,25 @@ describe("pesos nunca se misturam", () => {
       ["4x250", 250],
       ["2x500", 500],
     ]) {
-      const s = pick(catalog, offerId, ["caramelo", "bourbon", "caramelo", "espresso"].slice(0, offer(offerId).packs));
+      const s = pick(catalog, offerId, ["espresso", "bourbon", "espresso", "bourbon"].slice(0, offer(offerId).packs));
       const { order } = core.buildOrder(catalog, { ...s, shippingId: "pac", extras: {} });
       order.itens.forEach((item) => assert.equal(item.peso, size));
       assert.equal(order.kit.pesoPacote, size);
+      assert.equal(order.kit.moagem, size === 500 ? "em grãos" : "moído");
     }
   });
 
   test("ao trocar 250g por 500g os pacotes são recriados no novo peso", () => {
-    let s = pick(catalog, "4x250", ["caramelo", "bourbon", "espresso", "baunilha"]);
+    let s = pick(catalog, "4x250", ["espresso", "bourbon", "caramelo", "baunilha"]);
     s = core.changeOffer(catalog, s, "2x500");
     assert.equal(s.slots.length, 2);
     const { order } = core.buildOrder(catalog, { ...s, shippingId: "pac", extras: {} });
     assert.equal(order.tipoKit, "2x500g");
+    assert.equal(order.kit.descricao, "Kit Favoritos — 2×500g em grãos");
     assert.deepEqual(
       order.itens.map((i) => [i.sabor, i.peso]),
       [
-        ["Caramelo", 500],
+        ["Espresso", 500],
         ["Bourbon", 500],
       ],
     );
@@ -366,7 +383,7 @@ describe("pedido", () => {
     const s = pick(catalog, "4x250", ["caramelo", "bourbon", "caramelo", "chocolate-com-avela"]);
     const { order } = core.buildOrder(catalog, { ...s, shippingId: "sedex", extras: {} }, meta);
     const text = core.orderToText(order).replace(/\u00a0/g, " ");
-    assert.match(text, /\*Kit Variedade — 4×250g \(1kg\)\*/);
+    assert.match(text, /\*Kit Variedade — 4×250g moído \(1kg\)\*/);
     assert.match(text, /• 2× Caramelo 250g/);
     assert.match(text, /Entrega: SEDEX — R\$ 15,00 \(até 5 dias úteis\)/);
     assert.match(text, /\*Total: R\$ 84,90\*/);

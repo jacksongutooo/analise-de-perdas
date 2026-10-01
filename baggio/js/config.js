@@ -62,6 +62,15 @@
   };
   var DEFAULT_SHIPPING = "pac"; // entrega já marcada ao abrir a página
 
+  /* ── MOAGEM POR PESO ──────────────────────────────────────────────────────
+     Aparece junto do peso em toda a página e no pedido ("250g moído",
+     "500g em grãos"). Conforme o site oficial: 250g torrado e moído; 500g
+     (Bourbon e Espresso) em grãos. */
+  var GRIND = {
+    250: "moído",
+    500: "em grãos",
+  };
+
   /* ── SABORES ──────────────────────────────────────────────────────────────
      Adicionar: copie um bloco e troque id (sem espaço/acento), nome e foto.
      Remover: apague o bloco. Esgotou? available: false (aparece "Indisponível").
@@ -74,6 +83,7 @@
   var FLAVORS = [
     {
       id: "chocolate-com-avela",
+      sizes: [250], // só em 250g (500g: Bourbon e Espresso)
       name: "Chocolate com Avelã",
       image: "img/sabores/chocolate-com-avela-250g.webp",
       color: "#7b4a2d",
@@ -84,6 +94,7 @@
     },
     {
       id: "chocolate-com-menta",
+      sizes: [250], // só em 250g (500g: Bourbon e Espresso)
       name: "Chocolate com Menta",
       image: "img/sabores/chocolate-com-menta-250g.webp",
       color: "#2f7d6d",
@@ -94,6 +105,7 @@
     },
     {
       id: "chocolate-trufado",
+      sizes: [250], // só em 250g (500g: Bourbon e Espresso)
       name: "Chocolate Trufado",
       image: "img/sabores/chocolate-trufado-250g.webp",
       color: "#4a2c21",
@@ -104,6 +116,7 @@
     },
     {
       id: "caramelo",
+      sizes: [250], // só em 250g (500g: Bourbon e Espresso)
       name: "Caramelo",
       image: "img/sabores/caramelo-250g.webp",
       color: "#c47f2c",
@@ -114,6 +127,7 @@
     },
     {
       id: "baunilha",
+      sizes: [250], // só em 250g (500g: Bourbon e Espresso)
       name: "Baunilha",
       image: "img/sabores/baunilha-250g.webp",
       color: "#d9bf86",
@@ -299,11 +313,11 @@
   var ABOUT = {
     title: "CONHEÇA OS SABORES",
     intro: "Cafés especiais Baggio em {sabores.total} sabores. Toque em um sabor para ver a descrição.",
-    specsTitle: "Ficha técnica (pacotes de 250g)",
+    specsTitle: "Ficha técnica",
     specs: [
-      { label: "Tipo", value: "Café especial, 100% arábica" },
-      { label: "Qualidade", value: "Pontuação acima de 85" },
-      { label: "Torra e moagem", value: "Média (café torrado e moído)" },
+      { label: "Tipo", value: "Café especial, 100% arábica, torra média" },
+      { label: "Pacotes de 250g", value: "Café torrado e moído (moagem média), nos 7 sabores; pontuação acima de 85" },
+      { label: "Pacotes de 500g", value: "Bourbon e Espresso em grãos, para moer na hora; pontuação acima de 84" },
       { label: "Origem", value: "Mogiana Paulista e Sul de Minas (Espresso: Cerrado Mineiro)" },
       { label: "Marca", value: "Baggio Café, desde 1886" },
     ],
@@ -316,7 +330,7 @@
     { q: "Posso escolher todos os pacotes do mesmo sabor?", a: "Sim." },
     {
       q: "Qual a diferença entre 4×250g e 2×500g?",
-      a: "Ambos possuem 1kg. O kit 4×250g permite experimentar mais sabores. O kit 2×500g é indicado para quem quer maior quantidade dos seus favoritos.",
+      a: "Ambos possuem 1kg. O kit 4×250g permite experimentar mais sabores. O kit 2×500g é indicado para quem quer maior quantidade dos seus favoritos (Bourbon e Espresso, em grãos).",
     },
     { q: "O frete é grátis?", a: "Sim. A entrega via PAC é grátis." },
     { q: "Quanto demora o PAC?", a: "Prazo estimado de até {frete.pac.prazo} dias úteis." },
@@ -324,7 +338,11 @@
       q: "Existe entrega mais rápida?",
       a: "Sim. Você pode escolher SEDEX por mais {frete.sedex.preco}, com prazo estimado de até {frete.sedex.prazo} dias úteis.",
     },
-    { q: "Os pacotes são de quantos gramas?", a: "Existem opções de 250g e 500g." },
+    { q: "Os pacotes são de quantos gramas?", a: "Existem opções de 250g (todos os sabores) e 500g (Bourbon e Espresso)." },
+    {
+      q: "O café é moído ou em grãos?",
+      a: "Os pacotes de 250g são de café torrado e moído (moagem média). Os de 500g, de Bourbon e Espresso, são em grãos, para moer na hora.",
+    },
     { q: "Posso repetir sabores?", a: "Sim." },
   ];
 
@@ -376,6 +394,7 @@
     shipping: SHIPPING,
     defaultShipping: DEFAULT_SHIPPING,
     flavors: FLAVORS,
+    grind: GRIND,
     offers: OFFERS,
     offerMenu: OFFER_MENU,
     compare: COMPARE,
