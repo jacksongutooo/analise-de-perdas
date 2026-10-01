@@ -58,32 +58,41 @@
     if (typeof console !== "undefined" && console.warn) console.warn("[Baggio] " + message);
   }
 
-  /** Organiza a configuração (js/config.js) com os valores derivados de cada kit. */
+  /**
+   * Organiza a configuração (js/config.js) com os valores derivados de cada kit.
+   * Preço de referência ("De", riscado) = pacotes × preço normal do pacote avulso do
+   * mesmo peso (prices.regular250 / regular500; sem eles, unit250 / unit500).
+   */
   function createCatalog(config) {
     var prices = config.prices || {};
     var unitBySize = {};
+    var regularBySize = {};
     Object.keys(prices).forEach(function (key) {
-      var m = /^unit(\d+)$/.exec(key);
-      if (m) unitBySize[m[1]] = toCents(prices[key]);
+      var m = /^(unit|regular)(\d+)$/.exec(key);
+      var cents = m ? toCents(prices[key]) : null;
+      if (cents === null || cents <= 0) return;
+      if (m[1] === "unit") unitBySize[m[2]] = cents;
+      else regularBySize[m[2]] = cents;
     });
 
     var offers = [];
     var offerById = {};
     (config.offers || []).forEach(function (o) {
+      if (o.active === false) return; // kit desligado em config.js
       var size = Number(o.size);
       var packs = Number(o.packs);
       var priceCents = toCents(o.price);
-      var unitCents = unitBySize[size];
+      var regularUnitCents = regularBySize[size] || unitBySize[size];
       if (!o.id || !size || !(packs >= 1) || priceCents === null || priceCents <= 0) {
-        warn("Kit ignorado (confira id, size, packs e price): " + JSON.stringify(o));
+        warn("Kit ignorado (confira id, size, packs e price; para esconder um kit use active: false): " + JSON.stringify(o));
         return;
       }
-      if (!unitCents) {
+      if (!regularUnitCents) {
         warn("Kit " + o.id + ": falta o preço do pacote avulso de " + size + "g (prices.unit" + size + ").");
         return;
       }
-      var separateCents = unitCents * packs;
-      var savingsCents = Math.max(0, separateCents - priceCents);
+      var referenceCents = regularUnitCents * packs;
+      var savingsCents = Math.max(0, referenceCents - priceCents);
       var kitLabel = packs + "×" + size + "g";
       var offer = {
         id: String(o.id),
@@ -95,10 +104,11 @@
         cta: o.cta || "",
         upgradeTo: o.upgradeTo || "",
         priceCents: priceCents,
-        unitCents: unitCents,
-        separateCents: savingsCents > 0 ? separateCents : priceCents,
+        unitCents: unitBySize[size] || null, // preço atual do pacote avulso
+        regularUnitCents: regularUnitCents, // preço normal do pacote avulso
+        referenceCents: savingsCents > 0 ? referenceCents : priceCents, // "De" (riscado)
         savingsCents: savingsCents,
-        discountPercent: savingsCents > 0 ? Math.floor((savingsCents * 100) / separateCents) : 0,
+        discountPercent: savingsCents > 0 ? Math.floor((savingsCents * 100) / referenceCents) : 0,
         perPackCents: roundHalfDown(priceCents / packs),
         perPackExact: priceCents % packs === 0,
         totalGrams: size * packs,
@@ -206,12 +216,24 @@
     );
     var defaultOfferId = offerById[menu.defaultOffer] ? menu.defaultOffer : main[0] && main[0] !== "1kg" ? main[0] : offers[0] && offers[0].id;
 
+    // Promoção do pacote avulso por peso: [{size, regularCents, priceCents}] quando o preço atual é menor que o normal.
+    var packPromos = sizes
+      .filter(function (size) {
+        return unitBySize[size] && regularBySize[size] && unitBySize[size] < regularBySize[size];
+      })
+      .map(function (size) {
+        return { size: size, regularCents: regularBySize[size], priceCents: unitBySize[size] };
+      });
+
     return {
       offers: offers,
       offerById: offerById,
       flavors: flavors,
       flavorById: flavorById,
       sizes: sizes,
+      unitBySize: unitBySize,
+      regularBySize: regularBySize,
+      packPromos: packPromos,
       shipping: shipping,
       shippingById: shippingById,
       defaultShippingId: defaultShippingId,
@@ -390,11 +412,11 @@
     return {
       offer: offer,
       kitCents: kitCents,
-      separateCents: offer ? offer.separateCents : 0,
+      referenceCents: offer ? offer.referenceCents : 0,
       savingsCents: offer ? offer.savingsCents : 0,
       extras: extras,
       extrasCents: extrasCents,
-      originalCents: (offer ? offer.separateCents : 0) + extrasCents, // produtos a preço cheio
+      originalCents: (offer ? offer.referenceCents : 0) + extrasCents, // produtos pelo preço normal
       subtotalCents: subtotalCents,
       shipping: shipping,
       shippingCents: shippingCents,
@@ -469,7 +491,7 @@
         pesoPacote: offer.size,
         pesoTotal: offer.totalGrams,
         preco: fromCents(offer.priceCents),
-        precoSeparado: fromCents(offer.separateCents),
+        precoNormal: fromCents(offer.referenceCents), // pacotes pelo preço normal (o "De")
         economia: fromCents(offer.savingsCents),
       },
       itens: groupFlavors(catalog, input.slots).map(function (g) {
@@ -784,6 +806,11 @@
     catalog.shipping.forEach(function (s) {
       ctx["frete." + s.id + ".preco"] = formatBRL(s.priceCents);
       ctx["frete." + s.id + ".prazo"] = s.days === null ? "" : String(s.days);
+    });
+    // {preco.250}: preço atual do pacote avulso; {precoNormal.250}: preço normal (antes da promoção)
+    Object.keys(catalog.unitBySize || {}).forEach(function (size) {
+      ctx["preco." + size] = formatBRL(catalog.unitBySize[size]);
+      ctx["precoNormal." + size] = formatBRL((catalog.regularBySize || {})[size] || catalog.unitBySize[size]);
     });
     return ctx;
   }

@@ -201,16 +201,14 @@ html:not(.is-ready) .footer {
   text-overflow: ellipsis;
 }
 
+.topbar.is-wrap {
+  white-space: normal;
+}
+
 .topbar__part + .topbar__part::before {
   content: "•";
   margin: 0 10px;
   opacity: 0.7;
-}
-
-@media (max-width: 374px) {
-  .topbar__part + .topbar__part {
-    display: none;
-  }
 }
 
 .topbar__timer,
@@ -573,6 +571,56 @@ main {
   vertical-align: 1px;
 }
 
+/* Promoção */
+
+.promo-tag {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 7px;
+  border-radius: 4px;
+  background: #fff0e8;
+  border: 1px solid #f6c3a7;
+  color: #b23a0c;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  line-height: 1.3;
+}
+
+.promo-box {
+  margin: -2px 0 12px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: #fff6f1;
+  border: 1px solid #f6c3a7;
+}
+
+.promo-box__title {
+  color: #b23a0c;
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+}
+
+.promo-box__list {
+  display: grid;
+  gap: 2px;
+  margin: 4px 0 0;
+  padding: 0;
+  list-style: none;
+  color: var(--ink-2);
+  font-size: 13.5px;
+}
+
+.promo-box__list s {
+  color: var(--muted);
+}
+
+.promo-box__list b {
+  color: var(--price);
+  font-weight: 800;
+}
+
 .shipinfo {
   margin-top: 12px;
   padding: 10px 12px;
@@ -777,6 +825,13 @@ main {
   font-size: 11px;
   font-weight: 600;
   color: var(--muted);
+}
+
+.opt__old {
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.2;
+  white-space: nowrap;
 }
 
 .opt.is-selected .opt__price {
@@ -1286,6 +1341,12 @@ main {
   display: flex;
   gap: 12px;
   align-items: flex-start;
+}
+
+.extra + .extra {
+  margin-top: 14px;
+  padding-top: 14px;
+  border-top: 1px solid var(--line);
 }
 
 .extra__img {

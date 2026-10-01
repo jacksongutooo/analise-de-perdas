@@ -222,14 +222,21 @@
 
   /* ───────────────────────────── Faixa e logo ───────────────────────────── */
 
+  /** Promoção ligada em config.js (e dentro do prazo, se houver prazo). */
   function activePromo() {
     const p = config.promo;
-    if (!p || !p.active || !p.text) return null;
+    if (!p || !p.active) return null;
     if (p.endsAt) {
       const end = Date.parse(p.endsAt);
       if (!isFinite(end) || end <= Date.now()) return null;
     }
     return p;
+  }
+
+  /** Selo de promoção ao lado de um preço com desconto. */
+  function promoTag(o) {
+    const promo = activePromo();
+    return promo && o.savingsCents > 0 ? '<span class="promo-tag">🔥 ' + esc(promo.label || "PROMOÇÃO") + "</span>" : "";
   }
 
   function countdown(endsAt) {
@@ -244,22 +251,20 @@
   function renderTopbar() {
     const el = $("#faixa");
     const promo = activePromo();
-    let html = "";
-    if (promo) {
-      html = '<span class="topbar__promo">' + esc(promo.text) + "</span>";
-      if (promo.endsAt) html += ' <span class="topbar__timer" data-countdown>' + esc(countdown(promo.endsAt)) + "</span>";
-      if (promo.stockLeft) html += ' <span class="topbar__stock">Restam ' + esc(promo.stockLeft) + " unidades</span>";
-    } else if (store.topBar) {
-      // Partes separadas por "•": em telas estreitas aparece só a primeira.
-      html = fill(store.topBar)
-        .split("•")
-        .map((part) => part.trim())
-        .filter(Boolean)
-        .map((part) => '<span class="topbar__part">' + esc(part) + "</span>")
-        .join("");
-    }
+    // Partes separadas por "•" (a frase da promoção primeiro); as que não cabem na tela ficam de fora.
+    const parts = [];
+    if (promo && promo.topBar) parts.push(fill(promo.topBar).trim());
+    fill(store.topBar || "")
+      .split("•")
+      .map((part) => part.trim())
+      .filter(Boolean)
+      .forEach((part) => parts.push(part));
+    let html = parts.map((part) => '<span class="topbar__part">' + esc(part) + "</span>").join("");
+    if (promo && promo.endsAt) html += ' <span class="topbar__timer" data-countdown>' + esc(countdown(promo.endsAt)) + "</span>";
+    if (promo && promo.stockLeft) html += ' <span class="topbar__stock">Restam ' + esc(promo.stockLeft) + " unidades</span>";
     el.innerHTML = html;
     el.hidden = !html;
+    fitTopbar();
     clearInterval(promoTimer);
     if (promo && promo.endsAt) {
       promoTimer = setInterval(() => {
@@ -269,6 +274,26 @@
       }, 1000);
     }
   }
+
+  /** Faixa do topo em uma linha: esconde as últimas frases que não cabem; se nem a
+   *  primeira couber, diminui a letra (até 10px) e, em último caso, quebra a linha. */
+  function fitTopbar() {
+    const el = $("#faixa");
+    const parts = $$(".topbar__part", el);
+    const overflows = () => el.scrollWidth > el.clientWidth;
+    el.style.fontSize = "";
+    el.classList.remove("is-wrap");
+    parts.forEach((part) => (part.hidden = false));
+    for (let i = parts.length - 1; i > 0 && overflows(); i--) parts[i].hidden = true;
+    for (let size = 11.5; size >= 10 && overflows(); size -= 0.5) el.style.fontSize = size + "px";
+    if (overflows()) el.classList.add("is-wrap");
+  }
+
+  let fitTimer = 0;
+  window.addEventListener("resize", () => {
+    clearTimeout(fitTimer);
+    fitTimer = setTimeout(fitTopbar, 150);
+  });
 
   function renderLogo() {
     if (!store.logo) return;
@@ -448,7 +473,13 @@
     let html = "";
     if (o.savingsCents > 0) {
       html +=
-        '<p class="price__old"><span class="sr-only">De </span><s>' + money(o.separateCents) + '</s><span class="off">-' + o.discountPercent + "%</span></p>";
+        '<p class="price__old">' +
+        promoTag(o) +
+        '<span class="sr-only">De </span><s>' +
+        money(o.referenceCents) +
+        '</s><span class="off">-' +
+        o.discountPercent +
+        "%</span></p>";
     }
     html +=
       '<p class="price__now"><span class="sr-only">Por </span><span class="price__value">' +
@@ -469,7 +500,9 @@
 
   function offerRow(o, checked) {
     const side =
+      (o.savingsCents > 0 ? '<s class="opt__old"><span class="sr-only">De </span>' + money(o.referenceCents) + "</s>" : "") +
       '<span class="opt__price">' +
+      (o.savingsCents > 0 ? '<span class="sr-only">Por </span>' : "") +
       money(o.priceCents) +
       "</span>" +
       (o.packs > 1
@@ -526,7 +559,7 @@
           '<p class="kg__price">' +
           money(o.priceCents) +
           "</p>" +
-          (o.savingsCents ? '<p class="kg__old"><s>' + money(o.separateCents) + '</s> <span class="off off--sm">-' + o.discountPercent + "%</span></p>" : "") +
+          (o.savingsCents ? '<p class="kg__old"><s>' + money(o.referenceCents) + '</s> <span class="off off--sm">-' + o.discountPercent + "%</span></p>" : "") +
           (o.tagline ? '<p class="kg__tag">' + esc(o.tagline) + "</p>" : "") +
           '<button type="button" class="btn btn--sm btn--block ' +
           (selected ? "btn--cta" : "btn--outline") +
@@ -589,6 +622,30 @@
     );
   }
 
+  /** Quadro da promoção: "Pacote de 250g: de R$ 40,90 por R$ 29,90" (de PRICES.regular / unit). */
+  function promoBoxHTML() {
+    const promo = activePromo();
+    if (!promo || !catalog.packPromos.length) return "";
+    return (
+      '<div class="promo-box"><p class="promo-box__title">🔥 ' +
+      esc(promo.label || "PROMOÇÃO") +
+      '</p><ul class="promo-box__list">' +
+      catalog.packPromos
+        .map(
+          (p) =>
+            "<li>Pacote de " +
+            p.size +
+            "g: de <s>" +
+            money(p.regularCents) +
+            "</s> por <b>" +
+            money(p.priceCents) +
+            "</b></li>",
+        )
+        .join("") +
+      "</ul></div>"
+    );
+  }
+
   function nudgeHTML(o) {
     const up = core.upgradeFor(catalog, o.id);
     if (!up) return "";
@@ -634,6 +691,7 @@
       '<div class="block__head"><h2 class="block__title" id="ofertas-titulo">ESCOLHA SEU KIT</h2>' +
         (freeShipping ? '<span class="block__aside block__aside--free">🚚 Frete grátis no ' + esc(freeShipping.name) + "</span>" : "") +
         "</div>" +
+        promoBoxHTML() +
         '<fieldset class="opts"><legend class="sr-only">Escolha seu kit</legend>' +
         rows +
         "</fieldset>" +
@@ -924,6 +982,7 @@
 
   function extraControls(extra, variant) {
     const quantity = state.extras[extra.id] || 0;
+    const key = variant + "-" + extra.id;
     if (!extra.available) {
       return '<button type="button" class="btn btn--sm btn--muted" disabled>Disponível em breve</button>';
     }
@@ -932,7 +991,7 @@
         '<button type="button" class="btn btn--sm btn--outline" data-action="extra-add" data-extra="' +
         esc(extra.id) +
         '" data-key="extra-add-' +
-        variant +
+        esc(key) +
         '">Adicionar ao pedido por + ' +
         money(extra.priceCents) +
         "</button>"
@@ -947,45 +1006,51 @@
       '"><button type="button" data-action="extra-dec" data-extra="' +
       esc(extra.id) +
       '" data-key="extra-dec-' +
-      variant +
-      '" aria-label="Diminuir">−</button><span aria-live="polite">' +
+      esc(key) +
+      '" aria-label="Diminuir ' +
+      esc(extra.name) +
+      '">−</button><span aria-live="polite">' +
       quantity +
       '</span><button type="button" data-action="extra-inc" data-extra="' +
       esc(extra.id) +
       '" data-key="extra-inc-' +
-      variant +
-      '" aria-label="Aumentar"' +
+      esc(key) +
+      '" aria-label="Aumentar ' +
+      esc(extra.name) +
+      '"' +
       (quantity >= extra.maxQuantity ? " disabled" : "") +
       ">+</button></div></div>"
     );
   }
 
+  function extraCardHTML(extra) {
+    return (
+      '<div class="extra"><span class="extra__img"><img src="' +
+      esc(extra.image) +
+      '" alt="' +
+      esc(extra.fullName) +
+      '" width="160" height="160" loading="lazy" decoding="async"></span><div class="extra__body">' +
+      (extra.brand ? '<p class="extra__brand">' + esc(extra.brand) + "</p>" : "") +
+      '<p class="extra__name">' +
+      esc(extra.fullName) +
+      "</p>" +
+      (extra.description ? '<p class="extra__desc">' + esc(extra.description) + "</p>" : "") +
+      '<p class="extra__price">' +
+      (extra.priceCents !== null ? money(extra.priceCents) : '<span class="muted">Preço em breve</span>') +
+      "</p>" +
+      extraControls(extra, "page") +
+      "</div></div>"
+    );
+  }
+
+  /** "Complete seu café": um card por item de EXTRAS (ex.: cada sabor do biscoito xícara). */
   function renderExtra() {
-    const extra = catalog.extras[0];
     const el = $("#extra");
-    if (!extra) {
+    if (!catalog.extras.length) {
       el.hidden = true;
       return;
     }
-    patch(
-      el,
-      '<h2 class="block__title" id="extra-titulo">COMPLETE SEU CAFÉ 🍪</h2>' +
-        '<div class="extra"><span class="extra__img"><img src="' +
-        esc(extra.image) +
-        '" alt="' +
-        esc(extra.fullName) +
-        '" width="160" height="160" loading="lazy" decoding="async"></span><div class="extra__body">' +
-        (extra.brand ? '<p class="extra__brand">' + esc(extra.brand) + "</p>" : "") +
-        '<p class="extra__name">' +
-        esc(extra.fullName) +
-        "</p>" +
-        (extra.description ? '<p class="extra__desc">' + esc(extra.description) + "</p>" : "") +
-        '<p class="extra__price">' +
-        (extra.priceCents !== null ? money(extra.priceCents) : '<span class="muted">Preço em breve</span>') +
-        "</p>" +
-        extraControls(extra, "page") +
-        "</div></div>",
-    );
+    patch(el, '<h2 class="block__title" id="extra-titulo">COMPLETE SEU CAFÉ 🍪</h2>' + catalog.extras.map(extraCardHTML).join(""));
   }
 
   function changeExtra(id, delta) {
@@ -1034,7 +1099,7 @@
     let nums = "";
     if (o.packs > 1) nums += "<div><dt>Total</dt><dd>" + core.formatWeight(o.totalGrams) + " (" + o.packs + " pacotes)</dd></div>";
     if (o.savingsCents > 0) {
-      nums += "<div><dt>De</dt><dd><s>" + money(o.separateCents) + "</s></dd></div>";
+      nums += "<div><dt>De</dt><dd><s>" + money(o.referenceCents) + "</s></dd></div>";
       nums += "<div><dt>Por</dt><dd><b>" + money(o.priceCents) + "</b></dd></div>";
       nums += '<div class="is-save"><dt>Você economiza</dt><dd>' + money(o.savingsCents) + "</dd></div>";
     } else {
@@ -1211,7 +1276,7 @@
       flavors +
       "</ul>" +
       '<p class="citem__price">' +
-      (o.savingsCents ? "<s>" + money(o.separateCents) + "</s> " : "") +
+      (o.savingsCents ? "<s>" + money(o.referenceCents) + "</s> " : "") +
       "<b>" +
       money(o.priceCents) +
       "</b></p>" +
@@ -1233,17 +1298,20 @@
   }
 
   function cartExtrasHTML() {
+    let titled = false; // "COMPLETE SEU CAFÉ" uma vez só, no primeiro item ainda não adicionado
     return catalog.extras
       .map((extra) => {
         const quantity = state.extras[extra.id] || 0;
         if (!quantity && !extra.available) return "";
+        const title = !quantity && !titled;
+        if (title) titled = true;
         return (
           '<div class="cextra' +
           (quantity ? " is-added" : "") +
           '"><span class="cextra__img"><img src="' +
           esc(extra.image) +
           '" alt="" width="96" height="96" loading="lazy" decoding="async"></span><div class="cextra__body">' +
-          (quantity ? "" : '<p class="cextra__title">COMPLETE SEU CAFÉ 🍪</p>') +
+          (title ? '<p class="cextra__title">COMPLETE SEU CAFÉ 🍪</p>' : "") +
           '<p class="cextra__name">' +
           esc(extra.fullName) +
           "</p>" +
@@ -1252,7 +1320,9 @@
           (quantity
             ? '<button type="button" class="linkbtn linkbtn--danger" data-action="extra-remove" data-extra="' +
               esc(extra.id) +
-              '" data-key="extra-remove">' +
+              '" data-key="extra-remove-' +
+              esc(extra.id) +
+              '">' +
               ICON.trash +
               " Remover</button>"
             : "") +
@@ -1267,14 +1337,23 @@
     const ship = t.shipping;
     const o = t.offer;
     let rows =
-      "<div><dt>Subtotal <span class=\"muted\">(" +
+      "<div><dt>" +
+      (t.savingsCents ? "Preço normal" : "Subtotal") +
+      ' <span class="muted">(' +
       o.packs +
       (o.packs === 1 ? " pacote" : " pacotes") +
       (t.extras.length ? " + extras" : "") +
       ")</span></dt><dd>" +
       money(t.originalCents) +
       "</dd></div>";
-    if (t.savingsCents) rows += '<div class="is-save"><dt>Desconto do kit</dt><dd>- ' + money(t.savingsCents) + "</dd></div>";
+    if (t.savingsCents) {
+      rows +=
+        '<div class="is-save"><dt>Desconto' +
+        (activePromo() ? " da promoção" : "") +
+        "</dt><dd>- " +
+        money(t.savingsCents) +
+        "</dd></div>";
+    }
     rows += "<div><dt>Produtos</dt><dd>" + money(t.subtotalCents) + "</dd></div>";
     rows += "<div><dt>Entrega " + esc(ship.name) + "</dt><dd>" + (ship.priceCents ? money(ship.priceCents) : '<b class="free">GRÁTIS</b>') + "</dd></div>";
     if (ship.days) rows += "<div><dt>Prazo</dt><dd>até " + ship.days + " dias úteis</dd></div>";
@@ -1793,7 +1872,7 @@
           '</ul><p class="cmp__price">' +
           money(o.priceCents) +
           "</p>" +
-          (o.savingsCents ? '<p class="cmp__old"><s>' + money(o.separateCents) + "</s></p>" : "") +
+          (o.savingsCents ? '<p class="cmp__old"><s>' + money(o.referenceCents) + "</s></p>" : "") +
           '<button type="button" class="btn btn--cta btn--block btn--sm" data-action="offer-go" data-offer="' +
           esc(o.id) +
           '">' +

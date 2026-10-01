@@ -9,28 +9,36 @@
    • Salvou? É só recarregar a página.
    • Avaliações dos clientes ficam em js/reviews.js.
    • Textos podem usar marcadores que a página preenche sozinha:
-       {frete.pac.preco}  {frete.pac.prazo}  {frete.sedex.preco}  {frete.sedex.prazo}
+       {preco.250}        {preco.500}        {precoNormal.250}   {precoNormal.500}
+       {frete.pac.preco}  {frete.pac.prazo}  {frete.sedex.preco} {frete.sedex.prazo}
        {sabores.total}    {vendidos}         {vendidos.curto}
    ========================================================================== */
 (function () {
   "use strict";
 
   /* ── PREÇOS DOS CAFÉS (R$) ────────────────────────────────────────────────
-     "Valor comprando separado" e "economia" de cada kit são calculados com o
-     preço do pacote avulso do mesmo peso (unit250 ou unit500). Nunca escreva
-     desconto à mão. */
+     PROMOÇÃO: os pacotes estão com preço promocional.
+     regular250 / regular500 = preço normal do pacote (aparece riscado, "De").
+     O "De" de cada kit é a soma dos pacotes pelo preço normal; a economia e o
+     percentual saem daí. Nunca escreva desconto à mão.
+     Fim da promoção: iguale unit250/unit500 ao preço normal, ajuste os kits e
+     mude PROMO.active para false. */
   var PRICES = {
-    unit250: 40.90, //  1 pacote de 250g
-    kit2x250: 69.90, // 2 pacotes de 250g
-    kit3x250: 84.90, // 3 pacotes de 250g
-    kit4x250: 99.99, // 4 pacotes de 250g (1kg)
-    unit500: 75.00, //  1 pacote de 500g
-    kit2x500: 99.99, // 2 pacotes de 500g (1kg)
+    regular250: 40.90, // preço normal de 1 pacote de 250g (antes da promoção)
+    regular500: 75.00, // preço normal de 1 pacote de 500g (antes da promoção)
+
+    unit250: 29.90, //  1 pacote de 250g — promoção
+    unit500: 39.90, //  1 pacote de 500g — promoção
+    kit4x250: 69.90, // 4 pacotes de 250g (1kg) — promoção
+    kit2x500: 69.90, // 2 pacotes de 500g (1kg) — promoção
+    kit2x250: null, //  sem preço na promoção: kit desligado (veja OFFERS)
+    kit3x250: null, //  sem preço na promoção: kit desligado (veja OFFERS)
   };
 
   /* ── COPINHO DE COOKIE (extra) ────────────────────────────────────────────
-     Preço ainda não definido. Enquanto for null, o bloco aparece como
-     "em breve" e não entra no pedido. Para liberar, ex.: var COOKIE_PRICE = 12.90; */
+     Preço de cada copinho (vale para os dois sabores: Cacau e Choco Vanilla).
+     Ainda não definido: enquanto for null, eles aparecem como "em breve" e não
+     entram no pedido. Para liberar, ex.: var COOKIE_PRICE = 15.90; */
   var COOKIE_PRICE = null;
 
   /* ── FRETE ────────────────────────────────────────────────────────────────
@@ -76,11 +84,13 @@
      Cada kit tem UM único peso (size): pacotes de 250g e 500g nunca se misturam.
      id: usado no link direto (?kit=4x250) e no pedido.
      badge: selo do kit. tagline/cta: texto curto e botão da escolha de 1kg.
-     upgradeTo: kit sugerido em "Por + R$ X leve mais" (mesmo peso). */
+     upgradeTo: kit sugerido em "Por + R$ X leve mais" (mesmo peso).
+     active: false esconde o kit da página (para voltar: defina o preço em
+     PRICES e apague o active: false). */
   var OFFERS = [
-    { id: "1x250", size: 250, packs: 1, price: PRICES.unit250, name: "1 pacote", upgradeTo: "3x250" },
-    { id: "2x250", size: 250, packs: 2, price: PRICES.kit2x250, name: "Kit com 2", upgradeTo: "3x250" },
-    { id: "3x250", size: 250, packs: 3, price: PRICES.kit3x250, name: "Kit com 3", badge: "MAIS VENDIDO", upgradeTo: "4x250" },
+    { id: "1x250", size: 250, packs: 1, price: PRICES.unit250, name: "1 pacote", upgradeTo: "4x250" },
+    { id: "2x250", size: 250, packs: 2, price: PRICES.kit2x250, name: "Kit com 2", upgradeTo: "4x250", active: false },
+    { id: "3x250", size: 250, packs: 3, price: PRICES.kit3x250, name: "Kit com 3", badge: "MAIS VENDIDO", upgradeTo: "4x250", active: false },
     {
       id: "4x250",
       size: 250,
@@ -103,12 +113,13 @@
     },
   ];
 
-  /* Como os kits aparecem na primeira área comercial (sem mostrar 6 opções de cara). */
+  /* Como os kits aparecem na primeira área comercial (sem mostrar várias opções de cara).
+     Kits desligados (active: false) somem sozinhos destas listas. */
   var OFFER_MENU = {
-    main: ["1x250", "3x250", "1kg"], // "1kg" = grupo que abre Kit Variedade e Kit Favoritos
+    main: ["1x250", "1x500", "1kg"], // "1kg" = grupo que abre Kit Variedade e Kit Favoritos
     oneKg: { offers: ["4x250", "2x500"], name: "1KG", badge: "MELHOR OFERTA" },
-    more: ["2x250", "1x500"], // ficam em "Ver mais opções"
-    defaultOffer: "3x250", // kit já marcado ao abrir a página
+    more: ["2x250", "3x250"], // ficam em "Ver mais opções" (quando ativos)
+    defaultOffer: "1x250", // opção já marcada ao abrir a página
   };
 
   /* "Qual kit combina com você?" */
@@ -117,7 +128,9 @@
     { offer: "2x500", title: "JÁ TENHO MEUS FAVORITOS", cta: "ESCOLHER SABORES" },
   ];
 
-  /* ── EXTRAS ─────────────────────────────────────────────────────────────── */
+  /* ── EXTRAS ("Complete seu café") ─────────────────────────────────────────
+     Cada item vira um card (ex.: um por sabor do biscoito xícara). Todos usam
+     COOKIE_PRICE; para um preço diferente, troque price no item. */
   var EXTRAS = [
     {
       id: "copinho-cookie-cacau",
@@ -126,6 +139,17 @@
       brand: "Muma",
       description: "Copinho de cookie sabor cacau para acompanhar o seu café.",
       image: "img/extras/copinho-cookie-cacau.svg",
+      price: COOKIE_PRICE,
+      maxQuantity: 10,
+    },
+    {
+      // Segundo sabor, conforme o site oficial da Baggio (Copinho de Cookie Sabor Choco Vanilla 68g)
+      id: "copinho-cookie-choco-vanilla",
+      name: "Copinho de Cookie sabor Choco Vanilla",
+      weight: "68g",
+      brand: "Muma",
+      description: "Copinho de cookie sabor chocolate com baunilha para acompanhar o seu café.",
+      image: "img/extras/copinho-cookie-choco-vanilla.svg",
       price: COOKIE_PRICE,
       maxQuantity: 10,
     },
@@ -153,6 +177,8 @@
     logo: "", // caminho do logo (ex.: "img/logo.svg"); vazio = logo em texto
     title: "Café Baggio — {sabores.total} sabores para montar seu kit | Pacotes de 250g e 500g",
     description: "Combine ou repita sabores do jeito que quiser e receba em casa com frete grátis no PAC.",
+    // Faixa do topo: partes separadas por "•"; o que não couber na tela fica de fora
+    // (com a promoção ligada, a frase de PROMO.topBar vem primeiro).
     topBar: "🚚 FRETE GRÁTIS no PAC  •  ⚡ SEDEX em até {frete.sedex.prazo} dias úteis",
     sold: "+7.000 pacotes vendidos",
     soldShort: "+7 mil pacotes vendidos",
@@ -174,12 +200,15 @@
     },
   };
 
-  /* ── PROMOÇÃO (opcional) ──────────────────────────────────────────────────
-     Use SOMENTE para uma promoção real. Nada de contador falso: o prazo e o
-     estoque mostrados são exatamente os daqui. Desligada: active: false. */
+  /* ── PROMOÇÃO ─────────────────────────────────────────────────────────────
+     active: true mostra o selo PROMOÇÃO junto dos preços, a frase da faixa do
+     topo e o quadro "de R$ X por R$ Y" de cada pacote (calculado de PRICES).
+     Use SOMENTE para promoção real. Nada de contador falso: endsAt e stockLeft
+     só se forem reais (o prazo e o estoque mostrados são exatamente os daqui). */
   var PROMO = {
-    active: false,
-    text: "", // ex.: "Semana do Café: kits com preço especial"
+    active: true,
+    label: "PROMOÇÃO",
+    topBar: "🔥 PROMOÇÃO: 250g por {preco.250} · 500g por {preco.500}",
     endsAt: "", // fim real, ex.: "2026-10-15T23:59:59-03:00" (mostra a contagem regressiva)
     stockLeft: null, // estoque real limitado, ex.: 40 (mostra "Restam 40 unidades")
   };

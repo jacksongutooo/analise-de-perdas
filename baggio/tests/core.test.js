@@ -25,68 +25,79 @@ function pick(cat, offerId, flavorIds) {
   return selection;
 }
 
-describe("preços dos kits (calculados do valor unitário real)", () => {
-  test("pacote avulso de 250g e 500g", () => {
-    assert.equal(offer("1x250").priceCents, 4090);
-    assert.equal(offer("1x500").priceCents, 7500);
-    assert.equal(offer("1x250").savingsCents, 0);
-    assert.equal(offer("1x250").discountPercent, 0);
+describe("preços: promoção com o preço normal riscado (calculado do pacote avulso)", () => {
+  test("pacote de 250g: de R$ 40,90 por R$ 29,90 (promoção)", () => {
+    const o = offer("1x250");
+    assert.equal(brl(o.priceCents), "R$ 29,90");
+    assert.equal(brl(o.referenceCents), "R$ 40,90");
+    assert.equal(brl(o.savingsCents), "R$ 11,00");
+    assert.equal(o.discountPercent, 26); // 26,9%
   });
 
-  test("kit com 2 × 250g: R$ 34,95 por pacote, separado R$ 81,80, economia R$ 11,90", () => {
-    const o = offer("2x250");
-    assert.equal(brl(o.priceCents), "R$ 69,90");
-    assert.equal(brl(o.perPackCents), "R$ 34,95");
-    assert.equal(o.perPackExact, true);
-    assert.equal(brl(o.separateCents), "R$ 81,80");
-    assert.equal(brl(o.savingsCents), "R$ 11,90");
+  test("pacote de 500g: de R$ 75,00 por R$ 39,90 (promoção)", () => {
+    const o = offer("1x500");
+    assert.equal(brl(o.priceCents), "R$ 39,90");
+    assert.equal(brl(o.referenceCents), "R$ 75,00");
+    assert.equal(brl(o.savingsCents), "R$ 35,10");
+    assert.equal(o.discountPercent, 46); // 46,8%
   });
 
-  test("kit com 3 × 250g: R$ 28,30 por pacote, separado R$ 122,70, economia R$ 37,80, MAIS VENDIDO", () => {
-    const o = offer("3x250");
-    assert.equal(brl(o.priceCents), "R$ 84,90");
-    assert.equal(brl(o.perPackCents), "R$ 28,30");
-    assert.equal(brl(o.separateCents), "R$ 122,70");
-    assert.equal(brl(o.savingsCents), "R$ 37,80");
-    assert.equal(o.badge, "MAIS VENDIDO");
-  });
-
-  test("kit com 4 × 250g: 1kg, ≈ R$ 25,00 por pacote, separado R$ 163,60, economia R$ 63,61, MELHOR OFERTA", () => {
+  test("Kit Variedade 4 × 250g: 1kg por R$ 69,90, de R$ 163,60 (4 × preço normal), ≈ R$ 17,47 por pacote", () => {
     const o = offer("4x250");
-    assert.equal(brl(o.priceCents), "R$ 99,99");
+    assert.equal(brl(o.priceCents), "R$ 69,90");
     assert.equal(o.totalGrams, 1000);
     assert.equal(core.formatWeight(o.totalGrams), "1kg");
-    assert.equal(brl(o.perPackCents), "R$ 25,00");
+    assert.equal(brl(o.referenceCents), "R$ 163,60");
+    assert.equal(brl(o.savingsCents), "R$ 93,70");
+    assert.equal(brl(o.perPackCents), "R$ 17,47"); // 17,475 → arredonda para baixo no empate
     assert.equal(o.perPackExact, false);
-    assert.equal(brl(o.separateCents), "R$ 163,60");
-    assert.equal(brl(o.savingsCents), "R$ 63,61");
     assert.equal(o.badge, "MELHOR OFERTA");
   });
 
-  test("kit com 2 × 500g: 1kg, ≈ R$ 49,99 por pacote, separado R$ 150,00, economia R$ 50,01", () => {
+  test("Kit Favoritos 2 × 500g: 1kg pelo mesmo preço, de R$ 150,00, R$ 34,95 por pacote", () => {
     const o = offer("2x500");
-    assert.equal(brl(o.priceCents), "R$ 99,99");
+    assert.equal(brl(o.priceCents), "R$ 69,90");
     assert.equal(o.totalGrams, 1000);
-    assert.equal(brl(o.perPackCents), "R$ 49,99");
-    assert.equal(o.perPackExact, false);
-    assert.equal(brl(o.separateCents), "R$ 150,00");
-    assert.equal(brl(o.savingsCents), "R$ 50,01");
+    assert.equal(brl(o.referenceCents), "R$ 150,00");
+    assert.equal(brl(o.savingsCents), "R$ 80,10");
+    assert.equal(brl(o.perPackCents), "R$ 34,95");
+    assert.equal(o.perPackExact, true);
   });
 
   test("percentual de desconto arredondado para baixo (nunca maior que o real)", () => {
-    assert.equal(offer("2x250").discountPercent, 14); // 14,5%
-    assert.equal(offer("3x250").discountPercent, 30); // 30,8%
-    assert.equal(offer("4x250").discountPercent, 38); // 38,9%
-    assert.equal(offer("2x500").discountPercent, 33); // 33,3%
+    assert.equal(offer("4x250").discountPercent, 57); // 57,3%
+    assert.equal(offer("2x500").discountPercent, 53); // 53,4%
+  });
+
+  test("quadro da promoção: preço normal e promocional de cada pacote", () => {
+    assert.deepEqual(
+      catalog.packPromos.map((p) => [p.size, brl(p.regularCents), brl(p.priceCents)]),
+      [
+        [250, "R$ 40,90", "R$ 29,90"],
+        [500, "R$ 75,00", "R$ 39,90"],
+      ],
+    );
   });
 
   test("os preços vêm só da configuração central", () => {
     const cat = withConfig((c) => {
-      c.prices.unit250 = 50;
+      c.prices.regular250 = 50;
       c.offers.find((o) => o.id === "4x250").price = 120;
     });
-    assert.equal(cat.offerById["4x250"].separateCents, 20000);
+    assert.equal(cat.offerById["4x250"].referenceCents, 20000);
     assert.equal(cat.offerById["4x250"].savingsCents, 8000);
+  });
+
+  test("sem preço normal (fim da promoção), a referência é o preço atual do pacote", () => {
+    const cat = withConfig((c) => {
+      delete c.prices.regular250;
+    });
+    assert.equal(cat.offerById["1x250"].savingsCents, 0);
+    assert.equal(brl(cat.offerById["4x250"].referenceCents), "R$ 119,60"); // 4 × R$ 29,90
+    assert.deepEqual(
+      cat.packPromos.map((p) => p.size),
+      [500],
+    );
   });
 
   test("formatação em reais", () => {
@@ -101,25 +112,41 @@ describe("preços dos kits (calculados do valor unitário real)", () => {
 });
 
 describe("menu de ofertas", () => {
-  test("primeira área mostra só 1 pacote, Kit 3 e 1KG; o resto fica em Ver mais opções", () => {
-    assert.deepEqual(catalog.menu.main, ["1x250", "3x250", "1kg"]);
+  test("primeira área: 1 pacote 250g, 1 pacote 500g e 1KG; kits sem preço ficam fora", () => {
+    assert.deepEqual(catalog.menu.main, ["1x250", "1x500", "1kg"]);
     assert.deepEqual(catalog.menu.oneKg.offers, ["4x250", "2x500"]);
-    assert.deepEqual(catalog.menu.more, ["2x250", "1x500"]);
-    assert.equal(catalog.menu.defaultOfferId, "3x250");
+    assert.deepEqual(catalog.menu.more, []);
+    assert.equal(catalog.offerById["2x250"], undefined);
+    assert.equal(catalog.offerById["3x250"], undefined);
+    assert.equal(catalog.menu.defaultOfferId, "1x250");
+  });
+
+  test("kit desligado volta com preço e active: true", () => {
+    const cat = withConfig((c) => {
+      const kit3 = c.offers.find((o) => o.id === "3x250");
+      kit3.active = true;
+      kit3.price = 59.9; // preço só de teste
+    });
+    assert.equal(brl(cat.offerById["3x250"].priceCents), "R$ 59,90");
+    assert.equal(brl(cat.offerById["3x250"].referenceCents), "R$ 122,70");
+    assert.deepEqual(cat.menu.more, ["3x250"]);
   });
 
   test("as duas opções de 1kg têm o mesmo preço e 1kg cada", () => {
     const g = core.groupSummary(catalog, catalog.menu.oneKg.offers);
     assert.equal(g.samePrice, true);
-    assert.equal(g.minPriceCents, 9999);
-    assert.equal(g.maxSavingsCents, 6361);
+    assert.equal(g.minPriceCents, 6990);
+    assert.equal(g.maxSavingsCents, 9370);
     g.offers.forEach((o) => assert.equal(o.totalGrams, 1000));
   });
 
   test("sugestão de kit maior com a diferença real de preço", () => {
-    const up = core.upgradeFor(catalog, "3x250");
-    assert.equal(up.offer.id, "4x250");
-    assert.equal(brl(up.extraCents), "R$ 15,09");
+    const up250 = core.upgradeFor(catalog, "1x250");
+    assert.equal(up250.offer.id, "4x250");
+    assert.equal(brl(up250.extraCents), "R$ 40,00");
+    const up500 = core.upgradeFor(catalog, "1x500");
+    assert.equal(up500.offer.id, "2x500");
+    assert.equal(brl(up500.extraCents), "R$ 30,00");
     assert.equal(core.upgradeFor(catalog, "4x250"), null);
     assert.equal(core.upgradeFor(catalog, "2x500"), null);
   });
@@ -149,9 +176,9 @@ describe("monte seu kit", () => {
   });
 
   test("trocar o sabor de qualquer pacote", () => {
-    let s = pick(catalog, "3x250", ["caramelo", "bourbon", "espresso"]);
+    let s = pick(catalog, "4x250", ["caramelo", "bourbon", "espresso", "baunilha"]);
     s = core.setSlot(catalog, s, 1, "chocolate-com-menta");
-    assert.deepEqual(s.slots, ["caramelo", "chocolate-com-menta", "espresso"]);
+    assert.deepEqual(s.slots, ["caramelo", "chocolate-com-menta", "espresso", "baunilha"]);
   });
 
   test("completar os pacotes vazios com o mesmo sabor", () => {
@@ -168,14 +195,14 @@ describe("monte seu kit", () => {
 
   test("trocar de kit preserva os sabores e lembra os que não couberam", () => {
     let s = pick(catalog, "4x250", ["caramelo", "bourbon", "espresso", "baunilha"]);
-    s = core.changeOffer(catalog, s, "3x250");
-    assert.deepEqual(s.slots, ["caramelo", "bourbon", "espresso"]);
-    s = core.changeOffer(catalog, s, "4x250");
-    assert.deepEqual(s.slots, ["caramelo", "bourbon", "espresso", "baunilha"]);
     s = core.changeOffer(catalog, s, "2x500");
     assert.deepEqual(s.slots, ["caramelo", "bourbon"]);
+    s = core.changeOffer(catalog, s, "4x250");
+    assert.deepEqual(s.slots, ["caramelo", "bourbon", "espresso", "baunilha"]);
     s = core.changeOffer(catalog, s, "1x250");
     assert.deepEqual(s.slots, ["caramelo"]);
+    s = core.changeOffer(catalog, s, "4x250");
+    assert.deepEqual(s.slots, ["caramelo", "bourbon", "espresso", "baunilha"]);
   });
 
   test("sabor indisponível ou de outro peso não entra no kit", () => {
@@ -237,14 +264,14 @@ describe("frete e totais", () => {
     assert.equal(catalog.defaultShippingId, "pac");
     const t = core.computeTotals(catalog, { ...kit4, shippingId: "pac", extras: {} });
     assert.equal(t.shippingCents, 0);
-    assert.equal(brl(t.totalCents), "R$ 99,99");
+    assert.equal(brl(t.totalCents), "R$ 69,90");
     assert.equal(t.shipping.days, 10);
   });
 
   test("SEDEX soma R$ 15,00", () => {
     const t = core.computeTotals(catalog, { ...kit4, shippingId: "sedex", extras: {} });
     assert.equal(brl(t.shippingCents), "R$ 15,00");
-    assert.equal(brl(t.totalCents), "R$ 114,99");
+    assert.equal(brl(t.totalCents), "R$ 84,90");
     assert.equal(t.shipping.days, 5);
   });
 
@@ -263,8 +290,26 @@ describe("frete e totais", () => {
     });
     const t = core.computeTotals(cat, { ...kit4, shippingId: "sedex", extras: { "copinho-cookie-cacau": 2 } });
     assert.equal(brl(t.extrasCents), "R$ 25,80");
-    assert.equal(brl(t.subtotalCents), "R$ 125,79");
-    assert.equal(brl(t.totalCents), "R$ 140,79");
+    assert.equal(brl(t.subtotalCents), "R$ 95,70");
+    assert.equal(brl(t.totalCents), "R$ 110,70");
+    assert.equal(brl(t.originalCents), "R$ 189,40"); // preço normal: R$ 163,60 + R$ 25,80
+  });
+
+  test("biscoito xícara nos dois sabores do site oficial (Cacau e Choco Vanilla), cada um com seu card", () => {
+    assert.deepEqual(
+      catalog.extras.map((e) => [e.id, e.fullName, e.available]),
+      [
+        ["copinho-cookie-cacau", "Copinho de Cookie sabor Cacau — 68g", false],
+        ["copinho-cookie-choco-vanilla", "Copinho de Cookie sabor Choco Vanilla — 68g", false],
+      ],
+    );
+    const cat = withConfig((c) => c.extras.forEach((e) => (e.price = 12.9)));
+    const input = { ...kit4, shippingId: "pac", extras: { "copinho-cookie-cacau": 1, "copinho-cookie-choco-vanilla": 2 } };
+    const t = core.computeTotals(cat, input);
+    assert.equal(brl(t.extrasCents), "R$ 38,70");
+    assert.equal(brl(t.totalCents), "R$ 108,60");
+    const { order } = core.buildOrder(cat, input, { id: "BG-TESTE", now: new Date("2026-10-01T12:00:00Z") });
+    assert.deepEqual(order.extras.map((e) => [e.id, e.quantidade, e.total]), [["copinho-cookie-cacau", 1, 12.9], ["copinho-cookie-choco-vanilla", 2, 25.8]]);
   });
 });
 
@@ -282,12 +327,13 @@ describe("pedido", () => {
       { sabor: "Chocolate com Avelã", saborId: "chocolate-com-avela", peso: 250, quantidade: 1 },
     ]);
     assert.deepEqual(order.extras, []);
-    assert.equal(order.subtotal, 99.99);
+    assert.equal(order.subtotal, 69.9);
     assert.deepEqual(order.shipping, { id: "pac", method: "PAC", price: 0, estimatedDays: 10 });
-    assert.equal(order.total, 99.99);
-    assert.equal(order.kit.precoSeparado, 163.6);
-    assert.equal(order.kit.economia, 63.61);
-    assert.equal(order.desconto, 63.61);
+    assert.equal(order.total, 69.9);
+    assert.equal(order.kit.preco, 69.9);
+    assert.equal(order.kit.precoNormal, 163.6);
+    assert.equal(order.kit.economia, 93.7);
+    assert.equal(order.desconto, 93.7);
   });
 
   test("objeto do pedido com SEDEX e copinho de cookie", () => {
@@ -299,9 +345,9 @@ describe("pedido", () => {
     assert.equal(order.tipoKit, "2x500g");
     assert.deepEqual(order.itens, [{ sabor: "Espresso", saborId: "espresso", peso: 500, quantidade: 2 }]);
     assert.deepEqual(order.extras, [{ id: "copinho-cookie-cacau", nome: "Copinho de Cookie sabor Cacau — 68g", preco: 12.9, quantidade: 1, total: 12.9 }]);
-    assert.equal(order.subtotal, 112.89);
+    assert.equal(order.subtotal, 82.8);
     assert.deepEqual(order.shipping, { id: "sedex", method: "SEDEX", price: 15, estimatedDays: 5 });
-    assert.equal(order.total, 127.89);
+    assert.equal(order.total, 97.8);
   });
 
   test("não monta pedido com sabor faltando", () => {
@@ -328,14 +374,14 @@ describe("pedido", () => {
     assert.match(text, /\*Kit Variedade — 4×250g \(1kg\)\*/);
     assert.match(text, /• 2× Caramelo 250g/);
     assert.match(text, /Entrega: SEDEX — R\$ 15,00 \(até 5 dias úteis\)/);
-    assert.match(text, /\*Total: R\$ 114,99\*/);
+    assert.match(text, /\*Total: R\$ 84,90\*/);
 
     const params = new URLSearchParams(core.orderToParams(order));
     assert.equal(params.get("pedido"), "BG-TESTE");
     assert.equal(params.get("kit"), "4x250");
     assert.equal(params.get("sabores"), "caramelo:2,bourbon:1,chocolate-com-avela:1");
     assert.equal(params.get("frete"), "sedex");
-    assert.equal(params.get("total"), "114.99");
+    assert.equal(params.get("total"), "84.90");
     assert.deepEqual(JSON.parse(core.base64UrlDecode(params.get("dados"))), order);
     assert.equal(core.appendQuery("https://loja.com/checkout?x=1#a", "kit=1"), "https://loja.com/checkout?x=1&kit=1#a");
   });
@@ -459,6 +505,12 @@ describe("textos da configuração", () => {
     assert.match(fill(config.store.title), /^Café Baggio — 7 sabores/);
     assert.equal(fill("{vendidos}"), "+7.000 pacotes vendidos");
     assert.equal(fill("{desconhecido}"), "{desconhecido}");
+  });
+
+  test("frase da promoção com os preços da configuração", () => {
+    assert.equal(fill(config.promo.topBar), "🔥 PROMOÇÃO: 250g por R$ 29,90 · 500g por R$ 39,90");
+    assert.equal(fill("{precoNormal.250} → {preco.250}"), "R$ 40,90 → R$ 29,90");
+    assert.equal(fill("{precoNormal.500} → {preco.500}"), "R$ 75,00 → R$ 39,90");
   });
 
   test("Bourbon e Espresso marcados como Blend Premiado", () => {

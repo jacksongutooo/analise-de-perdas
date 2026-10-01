@@ -11,23 +11,28 @@ estática.
 ## O que tem na página
 
 - **Primeira dobra de marketplace:** galeria (deslizar no celular, miniaturas no computador, foto ampliada ao
-  tocar), preço riscado, desconto, preço grande, preço por pacote, economia, frete grátis, estrelas,
-  "Ver avaliações" e "+7.000 pacotes vendidos".
-- **Escolha do kit sem confusão:** de cara só aparecem *1 pacote*, *Kit com 3 (MAIS VENDIDO)* e *1KG (MELHOR
+  tocar), selo 🔥 PROMOÇÃO, preço normal riscado, desconto, preço grande, preço por pacote, economia, frete
+  grátis, estrelas, "Ver avaliações" e "+7.000 pacotes vendidos".
+- **Promoção bem clara:** a faixa do topo avisa "🔥 PROMOÇÃO: 250g por R$ 29,90 · 500g por R$ 39,90" e, logo
+  acima dos kits, um quadro mostra "Pacote de 250g: de ~~R$ 40,90~~ por R$ 29,90" e "Pacote de 500g: de
+  ~~R$ 75,00~~ por R$ 39,90". Todos os preços aparecem como "De (riscado) / Por".
+- **Escolha do kit sem confusão:** de cara só aparecem *1 pacote de 250g*, *1 pacote de 500g* e *1KG (MELHOR
   OFERTA)*. O 1KG abre *Kit Variedade (4×250g)* e *Kit Favoritos (2×500g)*, com o aviso de que os dois têm 1kg e
-  o mesmo preço. *Kit com 2* e *1 pacote de 500g* ficam em "Ver mais opções". Uma sugestão calculada mostra
-  quanto falta para o kit maior ("Por + R$ 15,09 leve 4 pacotes").
+  o mesmo preço. Uma sugestão calculada mostra quanto falta para o kit de 1kg ("Por + R$ 40,00 leve 4
+  pacotes (1kg): ≈ R$ 17,47 cada").
 - **Monte seu kit:** pacotes numerados com a foto do sabor escolhido e cards de sabor com foto, nome, peso,
-  borda de destaque e ✓ (ou 2×, 3×…). Dá para repetir, usar o mesmo sabor em todos ("Usar Caramelo nos 3
-  pacotes restantes") e trocar qualquer pacote. A página mostra "3 de 4 sabores escolhidos" e depois "Seu kit
+  borda de destaque e ✓ (ou 2×, 3×…). No pacote avulso é só tocar no sabor (tocar em outro troca). Nos kits dá
+  para repetir, usar o mesmo sabor em todos ("Usar Caramelo nos 3 pacotes restantes") e trocar qualquer
+  pacote. A página mostra "3 de 4 sabores escolhidos" e depois "Seu kit
   está pronto ✓". Bourbon e Espresso levam o selo **🏅 BLEND PREMIADO**.
 - **250g e 500g nunca se misturam:** cada kit tem um peso só. Ao trocar de kit, os sabores já escolhidos são
   mantidos (e voltam se o cliente retornar a um kit maior).
 - **Entrega:** PAC grátis já marcado e SEDEX por + R$ 15,00. O total muda na hora, sem recarregar.
-- **Copinho de Cookie (COMPLETE SEU CAFÉ 🍪)**, com "Adicionar ao pedido por + R$ X".
+- **Copinho de Cookie Muma (COMPLETE SEU CAFÉ 🍪)** nos dois sabores do site oficial, **Cacau** e **Choco
+  Vanilla** (68g), cada um com o seu card e "Adicionar ao pedido por + R$ X". Cada sabor é um item de `EXTRAS`.
 - **Resumo do kit** com "De / Por / Você economiza" e o total.
-- **Barra fixa no rodapé** com preço, frete e o botão (ESCOLHER SABORES enquanto falta sabor, COMPRAR AGORA
-  com o kit pronto).
+- **Barra fixa no rodapé** com preço, frete e o botão (ESCOLHER SABOR/SABORES enquanto falta sabor, COMPRAR
+  AGORA com o pedido pronto).
 - **Carrinho** (gaveta de baixo no celular, lateral no computador): editar sabores, trocar o kit, remover,
   mudar a entrega, extras, subtotal, desconto, prazo e total, e o botão FINALIZAR COMPRA.
 - **Avaliações estilo marketplace:** nota média, distribuição por estrelas, filtros (todas, 5/4/3 estrelas,
@@ -44,15 +49,16 @@ Quase tudo fica em **`js/config.js`**. Nenhum preço está digitado em outro arq
 
 | O quê | Onde |
 |---|---|
-| Preços dos cafés | `js/config.js` → `PRICES` |
+| Preços dos cafés (normal e promoção) | `js/config.js` → `PRICES` |
+| Promoção (selo, quadro e faixa do topo) | `js/config.js` → `PROMO` |
 | Preço do copinho de cookie | `js/config.js` → `COOKIE_PRICE` |
+| Copinho de cookie e outros sabores do biscoito xícara | `js/config.js` → `EXTRAS` |
 | Sabores (adicionar, remover, esgotado, Blend Premiado, fotos) | `js/config.js` → `FLAVORS` |
-| Kits, selos e o que aparece de cara | `js/config.js` → `OFFERS` e `OFFER_MENU` |
+| Kits, selos, kits ligados/desligados e o que aparece de cara | `js/config.js` → `OFFERS` e `OFFER_MENU` |
 | Frete (PAC, SEDEX, preço e prazo) | `js/config.js` → `SHIPPING` |
 | Fotos da galeria | `js/config.js` → `GALLERY` |
 | Título, descrição, faixa do topo, "+7.000 pacotes vendidos", rodapé | `js/config.js` → `STORE` |
 | Benefícios e dúvidas frequentes | `js/config.js` → `BENEFITS` e `FAQ` |
-| Promoção real com prazo ou estoque (desligada) | `js/config.js` → `PROMO` |
 | Checkout | `js/config.js` → `CHECKOUT` |
 | Eventos de analytics | `js/config.js` → `ANALYTICS` |
 | **Avaliações** | **`js/reviews.js`** |
@@ -61,20 +67,34 @@ Quase tudo fica em **`js/config.js`**. Nenhum preço está digitado em outro arq
 Os valores são em reais com **ponto** decimal (`40.90`). Depois de salvar, é só recarregar a página. Se o
 `config.js` tiver um erro de digitação, a página mostra um aviso no lugar do conteúdo.
 
-## Preços e descontos
+## Preços e promoção
 
-| Kit | Preço | Por pacote | Comprando separado | Economia | Selo |
+| Oferta | De (preço normal) | Por (promoção) | Por pacote | Economia | Selo |
 |---|---|---|---|---|---|
-| 1 pacote 250g | R$ 40,90 | — | — | — | |
-| Kit com 2 (2×250g) | R$ 69,90 | R$ 34,95 | R$ 81,80 | R$ 11,90 (-14%) | |
-| Kit com 3 (3×250g) | R$ 84,90 | R$ 28,30 | R$ 122,70 | R$ 37,80 (-30%) | MAIS VENDIDO |
-| Kit Variedade (4×250g, 1kg) | R$ 99,99 | ≈ R$ 25,00 | R$ 163,60 | R$ 63,61 (-38%) | MELHOR OFERTA |
-| 1 pacote 500g | R$ 75,00 | — | — | — | |
-| Kit Favoritos (2×500g, 1kg) | R$ 99,99 | ≈ R$ 49,99 | R$ 150,00 | R$ 50,01 (-33%) | |
+| 1 pacote 250g | R$ 40,90 | **R$ 29,90** | — | R$ 11,00 (-26%) | 🔥 PROMOÇÃO |
+| 1 pacote 500g | R$ 75,00 | **R$ 39,90** | — | R$ 35,10 (-46%) | 🔥 PROMOÇÃO |
+| Kit Variedade (4×250g, 1kg) | R$ 163,60 | **R$ 69,90** | ≈ R$ 17,47 | R$ 93,70 (-57%) | MELHOR OFERTA |
+| Kit Favoritos (2×500g, 1kg) | R$ 150,00 | **R$ 69,90** | R$ 34,95 | R$ 80,10 (-53%) | |
 
-Só os preços de venda são digitados. "Comprando separado" é sempre o preço do pacote avulso do mesmo peso vezes
-a quantidade, e a economia é a diferença. Quando a divisão não é exata, o preço por pacote aparece com "≈",
-arredondado sem nunca aumentar. O percentual de desconto é arredondado para baixo.
+Em `PRICES` ficam o preço normal de cada pacote (`regular250`, `regular500`) e os preços da promoção
+(`unit250`, `unit500`, `kit4x250`, `kit2x500`). O "De" de qualquer oferta é sempre a quantidade de pacotes vezes o
+preço normal do mesmo peso, e a economia é a diferença; nada disso é digitado. Quando a divisão não é exata, o
+preço por pacote aparece com "≈", arredondado sem nunca aumentar. O percentual de desconto é arredondado para
+baixo.
+
+**Kit com 2 e Kit com 3 (250g) estão desligados** (`active: false` em `OFFERS`) porque ainda não têm preço na
+promoção: não aparecem na página, no carrinho nem pelo link `?kit=`. Para religar, coloque o preço em
+`PRICES.kit2x250`/`kit3x250`, apague o `active: false` do kit e, se quiser que ele apareça de cara, inclua o id em
+`OFFER_MENU.main` (ou deixe em `OFFER_MENU.more` para ficar em "Ver mais opções").
+
+**Promoção** (`PROMO`): com `active: true` aparecem o selo 🔥 PROMOÇÃO, o quadro "de/por" acima dos kits, a frase
+de `PROMO.topBar` na faixa do topo e "Desconto da promoção" no carrinho. A frase aceita `{preco.250}`,
+`{preco.500}`, `{precoNormal.250}` e `{precoNormal.500}`, preenchidos a partir de `PRICES`. Para encerrar a
+promoção: `active: false` e os preços de venda de volta ao normal. `endsAt` (data de término real) e `stockLeft`
+(estoque real) só aparecem se forem preenchidos — nunca com números inventados.
+
+No celular, a faixa do topo mostra primeiro a promoção; as frases seguintes só aparecem se couberem na largura
+da tela.
 
 ## Imagens oficiais
 
@@ -86,7 +106,7 @@ na pasta indicada e mude o caminho correspondente em `js/config.js`:
 | Galeria (embalagem, café servido, detalhes, preparo, sabores, blends, kits) | `img/galeria/` | `GALLERY` | 1200×1200, quadrada |
 | Foto de cada sabor (pacote 250g) | `img/sabores/` | `FLAVORS` → `image` | 600×600, quadrada |
 | Foto do pacote de 500g (opcional) | `img/sabores/` | `FLAVORS` → `image500` | 600×600, quadrada |
-| Copinho de Cookie | `img/extras/` | `EXTRAS` → `image` | 600×600, quadrada |
+| Copinho de Cookie (Cacau e Choco Vanilla) | `img/extras/` | `EXTRAS` → `image` | 600×600, quadrada |
 | Fotos dos clientes | `img/avaliacoes/` | `js/reviews.js` → `images` | até 1080px no lado maior |
 | Logo (opcional) | `img/` | `STORE` → `logo` | SVG ou PNG com 64px de altura |
 | Compartilhamento (WhatsApp, Facebook) | `img/og-image.png` | `index.html` | 1200×630 |
@@ -118,7 +138,7 @@ var reviews = [
     date: "2026-09-12",              // ou "12/09/2026"
     flavor: "chocolate-com-avela",   // id ou nome do sabor; vários: ["caramelo", "bourbon"]
     size: "250g",
-    kit: "4x250",                    // id do kit (1x250, 2x250, 3x250, 4x250, 1x500, 2x500) ou texto livre
+    kit: "4x250",                    // id do kit (1x250, 4x250, 1x500, 2x500) ou texto livre
     verified: true,                  // true SOMENTE se a compra foi confirmada
     text: "[texto da avaliação]",
     images: ["img/avaliacoes/cliente-1.jpg"],
@@ -160,18 +180,18 @@ Objeto do pedido (também salvo no navegador como `baggio:ultimo-pedido`):
 {
   id: "BG-261001-K7QX",
   tipoKit: "4x250g",
-  kit: { id: "4x250", nome: "Kit Variedade", pacotes: 4, pesoPacote: 250, pesoTotal: 1000,
-         preco: 99.99, precoSeparado: 163.6, economia: 63.61 },
+  kit: { id: "4x250", nome: "Kit Variedade", descricao: "Kit Variedade — 4×250g", pacotes: 4,
+         pesoPacote: 250, pesoTotal: 1000, preco: 69.9, precoNormal: 163.6, economia: 93.7 },
   itens: [
     { sabor: "Caramelo", saborId: "caramelo", peso: 250, quantidade: 2 },
     { sabor: "Bourbon", saborId: "bourbon", peso: 250, quantidade: 1 },
     { sabor: "Chocolate com Avelã", saborId: "chocolate-com-avela", peso: 250, quantidade: 1 }
   ],
   extras: [],
-  subtotal: 99.99,
-  desconto: 63.61,
+  subtotal: 69.9,
+  desconto: 93.7,
   shipping: { id: "pac", method: "PAC", price: 0, estimatedDays: 10 },
-  total: 99.99,
+  total: 69.9,
   moeda: "BRL",
   criadoEm: "2026-10-01T12:00:00.000Z"
 }
@@ -204,8 +224,8 @@ CompletePayment), mapeados em `ANALYTICS`. Adicione `?debug=1` ao endereço para
 
 ## Link direto para um kit
 
-`index.html?kit=4x250` já abre a página com o Kit Variedade marcado (vale para `1x250`, `2x250`, `3x250`,
-`4x250`, `1x500` e `2x500`). É útil em anúncios.
+`index.html?kit=4x250` já abre a página com o Kit Variedade marcado (vale para `1x250`, `4x250`, `1x500` e
+`2x500`, e para os kits que forem religados). É útil em anúncios.
 
 ## Publicar
 
@@ -214,14 +234,15 @@ CompletePayment), mapeados em `ANALYTICS`. Adicione `?debug=1` ao endereço para
 - **Netlify / Cloudflare Pages:** pasta de publicação `baggio`, sem comando de build.
 - **Qualquer hospedagem:** envie o conteúdo da pasta `baggio`.
 
-Essas hospedagens já entregam os arquivos compactados (gzip/brotli): a página inteira fica em torno de 56 KB
+Essas hospedagens já entregam os arquivos compactados (gzip/brotli): a página inteira fica em torno de 58 KB
 na primeira visita, sem contar as fotos oficiais.
 
 ## Antes de publicar
 
-- [ ] Fotos oficiais no lugar das imagens "FOTO PROVISÓRIA" (galeria, sabores e copinho de cookie).
+- [ ] Fotos oficiais no lugar das imagens "FOTO PROVISÓRIA" (galeria, sabores e os dois copinhos de cookie).
+- [ ] Preços do Kit com 2 e do Kit com 3, se forem voltar (hoje desligados).
 - [ ] Avaliações reais em `js/reviews.js` (ou `showPlaceholders: false`).
-- [ ] `COOKIE_PRICE` definido (até lá o copinho aparece como "em breve").
+- [ ] `COOKIE_PRICE` definido (até lá os copinhos aparecem como "em breve").
 - [ ] `CHECKOUT` configurado (`"link"` ou `"whatsapp"`); no modo `"demo"` o cliente não chega ao pagamento.
 - [ ] Rodapé em `STORE`: WhatsApp, e-mail, horário, razão social, CNPJ, endereço e os links das políticas
       (os campos vazios aparecem como "[a preencher]").
@@ -236,8 +257,8 @@ node --test baggio/tests/core.test.js
 ```
 
 Esse comando não precisa instalar nada. Ele confere preços, preço por pacote, economia, descontos, kits sem
-mistura de pesos, troca de kit preservando sabores, frete, copinho de cookie, objeto do pedido, link do
-checkout, mensagem do WhatsApp e as contas das avaliações.
+mistura de pesos, preço normal × promoção, kits desligados, troca de kit preservando sabores, frete, copinho
+de cookie, objeto do pedido, link do checkout, mensagem do WhatsApp e as contas das avaliações.
 
 Teste de ponta a ponta no navegador (Chromium, celular e computador; precisa do Playwright):
 
