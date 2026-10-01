@@ -1,0 +1,108 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Café Baggio — Monte seu kit com até 4 sabores | Frete grátis no PAC</title>
+  <meta name="description" content="Escolha seus sabores de Café Baggio, monte seu kit com pacotes de 250g ou 500g e receba com frete grátis no PAC. Blends premiados Bourbon e Espresso.">
+  <meta name="theme-color" content="#ffffff">
+  <meta name="color-scheme" content="light">
+  <meta name="format-detection" content="telephone=no">
+  <link rel="icon" href="img/favicon.svg" type="image/svg+xml">
+
+  <!-- Compartilhamento (WhatsApp, Facebook...). Depois de publicar, troque
+       img/og-image.png e o canonical pelo endereço completo (https://seudominio.com.br/...). -->
+  <meta property="og:type" content="website">
+  <meta property="og:locale" content="pt_BR">
+  <meta property="og:site_name" content="Baggio Café">
+  <meta property="og:title" content="Café Baggio — Monte seu kit com até 4 sabores">
+  <meta property="og:description" content="Pacotes de 250g e 500g, blends premiados e frete grátis no PAC.">
+  <meta property="og:image" content="img/og-image.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta name="twitter:card" content="summary_large_image">
+  <!-- <link rel="canonical" href="https://seudominio.com.br/"> -->
+
+  <link rel="stylesheet" href="css/loja.css">
+
+  <!-- Configuração da loja (preços, sabores, kits, frete...). Carrega primeiro
+       para já pedir a foto principal da galeria. -->
+  <script src="js/config.js"></script>
+  <script>
+    (function () {
+      var g = window.BAGGIO_CONFIG && window.BAGGIO_CONFIG.gallery;
+      if (!g || !g[0] || !g[0].src) return;
+      var l = document.createElement("link");
+      l.rel = "preload";
+      l.as = "image";
+      l.href = g[0].src;
+      l.setAttribute("fetchpriority", "high");
+      document.head.appendChild(l);
+    })();
+  </script>
+  <script src="js/reviews.js" defer></script>
+  <script src="js/core.js" defer></script>
+  <script src="js/analytics.js" defer></script>
+  <script src="js/loja.js" defer></script>
+
+  <!-- ===================================================================
+       ANALYTICS / PIXELS: cole aqui o código-base do Google Tag Manager,
+       Google Analytics 4 (gtag.js), Meta Pixel e/ou TikTok Pixel.
+       Os eventos da página já são enviados por js/analytics.js.
+       =================================================================== -->
+</head>
+<body>
+  <a class="skip" href="#comprar">Ir para a compra</a>
+
+  <div class="topbar" id="faixa"></div>
+
+  <header class="header" id="topo">
+    <div class="header__in">
+      <a class="logo" id="logo" href="#topo" aria-label="Baggio Café — início">
+        <span class="logo__name">Baggio</span><span class="logo__tag">CAFÉ</span>
+      </a>
+      <nav class="header__nav" aria-label="Seções">
+        <a href="#ofertas">Kits</a>
+        <a href="#avaliacoes" data-action="go-reviews">Avaliações</a>
+        <a href="#duvidas">Dúvidas</a>
+      </nav>
+      <button type="button" class="cartbtn" id="btn-carrinho" data-action="cart-open" aria-label="Abrir carrinho">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 7h12l-1 13H7L6 7Z"/><path d="M9 7a3 3 0 0 1 6 0"/></svg>
+        <span class="cartbtn__qty" id="carrinho-qtd" hidden></span>
+      </button>
+    </div>
+  </header>
+
+  <main>
+    <section class="product" id="produto" aria-label="Produto">
+      <div class="gallery" id="galeria"></div>
+      <div class="buy">
+        <div class="pinfo block" id="info"></div>
+        <div class="buybox" id="comprar">
+          <section class="block" id="ofertas" aria-labelledby="ofertas-titulo"></section>
+          <section class="block" id="montar" aria-labelledby="montar-titulo"></section>
+          <section class="block" id="entrega" aria-label="Entrega"></section>
+          <section class="block" id="extra" aria-labelledby="extra-titulo"></section>
+          <section class="block summary" id="resumo" aria-labelledby="resumo-titulo"></section>
+        </div>
+      </div>
+    </section>
+
+    <section class="block section" id="beneficios" aria-label="Benefícios"></section>
+    <section class="block section" id="kits" aria-labelledby="kits-titulo"></section>
+    <section class="block section" id="avaliacoes" aria-labelledby="avaliacoes-titulo"></section>
+    <section class="block section" id="duvidas" aria-labelledby="duvidas-titulo"></section>
+  </main>
+
+  <footer class="footer" id="rodape"></footer>
+
+  <div class="bar" id="barra" aria-hidden="true"></div>
+  <div class="sheet" id="carrinho" role="dialog" aria-modal="true" aria-labelledby="carrinho-titulo" hidden></div>
+  <div class="lightbox" id="visualizador" role="dialog" aria-modal="true" aria-label="Fotos" hidden></div>
+  <div class="toast" id="aviso" role="status" aria-live="polite"></div>
+
+  <noscript>
+    <p class="noscript">Para escolher os sabores e montar seu kit, ative o JavaScript do navegador.</p>
+  </noscript>
+</body>
+</html>

@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Pedido recebido — Baggio Café</title>
+  <meta name="robots" content="noindex, nofollow">
+  <meta name="theme-color" content="#ffffff">
+  <meta name="color-scheme" content="light">
+  <link rel="icon" href="img/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="css/loja.css">
+  <script src="js/config.js"></script>
+  <script src="js/core.js" defer></script>
+  <script src="js/analytics.js" defer></script>
+  <script src="js/obrigado.js" defer></script>
+
+  <!-- ===================================================================
+       Página de retorno do checkout: configure na plataforma de pagamento
+       para o cliente voltar aqui DEPOIS do pagamento aprovado. Ela mostra o
+       pedido e dispara o evento "purchase" (uma vez por pedido).
+       ANALYTICS / PIXELS: cole aqui os mesmos códigos-base do index.html.
+       =================================================================== -->
+</head>
+<body>
+  <header class="header">
+    <div class="header__in">
+      <a class="logo" href="index.html" aria-label="Baggio Café — voltar para a loja">
+        <span class="logo__name">Baggio</span><span class="logo__tag">CAFÉ</span>
+      </a>
+    </div>
+  </header>
+
+  <main class="thanks" id="obrigado">
+    <div class="block thanks__card">
+      <p class="done__icon" aria-hidden="true"><svg class="i" viewBox="0 0 24 24" width="28" height="28"><path d="M5 12.5l4.2 4.2L19 7" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg></p>
+      <h1 class="thanks__title">Pedido recebido!</h1>
+      <p class="thanks__text">Obrigado por comprar com a Baggio Café.</p>
+      <div id="obrigado-pedido"></div>
+      <a class="btn btn--outline btn--block" href="index.html">Voltar para a loja</a>
+    </div>
+  </main>
+</body>
+</html>
