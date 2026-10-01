@@ -504,8 +504,9 @@ await check("22 galeria: deslizar, contador, miniaturas (desktop) e ampliar", as
   await d.ctx.close();
 });
 
-await check("23 copinho de cookie: em breve sem preço; com COOKIE_PRICE soma no total, carrinho e pedido", async () => {
-  const a = await open(MOBILE);
+await check("23 copinho de cookie: R$ 9,99 cada, soma no total, carrinho e pedido; sem preço fica em breve", async () => {
+  // Sem preço (COOKIE_PRICE = null): "em breve" e fora do pedido
+  const a = await open(MOBILE, { config: (src) => src.replace("var COOKIE_PRICE = 9.99;", "var COOKIE_PRICE = null;") });
   assert.match(
     await text(a.page, "#extra"),
     /COMPLETE SEU CAFÉ 🍪 MUMA Copinho de Cookie sabor Cacau — 68g .* Preço em breve Disponível em breve MUMA Copinho de Cookie sabor Choco Vanilla — 68g .* Preço em breve Disponível em breve/,
@@ -513,30 +514,33 @@ await check("23 copinho de cookie: em breve sem preço; com COOKIE_PRICE soma no
   assert.deepEqual(await a.page.locator("#extra button").evaluateAll((els) => els.map((b) => b.disabled)), [true, true]);
   await a.ctx.close();
 
-  const { ctx, page } = await open(MOBILE, { config: (src) => src.replace("var COOKIE_PRICE = null;", "var COOKIE_PRICE = 12.90;") });
+  const { ctx, page } = await open(MOBILE);
+  assert.match(
+    await text(page, "#extra"),
+    /Copinho de Cookie sabor Cacau — 68g .* R\$ 9,99 Adicionar ao pedido por \+ R\$ 9,99 .*Copinho de Cookie sabor Choco Vanilla — 68g .* R\$ 9,99 Adicionar ao pedido por \+ R\$ 9,99$/,
+  );
   await page.locator('#ofertas label:has(input[value="1kg"])').click();
   await pickFlavors(page, ["caramelo", "caramelo", "caramelo", "caramelo"]);
-  assert.match(await text(page, "#extra"), /Adicionar ao pedido por \+ R\$ 12,90/);
   await page.locator('#extra [data-extra="copinho-cookie-cacau"][data-action="extra-add"]').click();
-  assert.match(await text(page, "#resumo"), /1× Copinho de Cookie sabor Cacau — 68g \+ R\$ 12,90 .* Extras \+ R\$ 12,90 .* TOTAL R\$ 82,80/);
+  assert.match(await text(page, "#resumo"), /1× Copinho de Cookie sabor Cacau — 68g \+ R\$ 9,99 .* Extras \+ R\$ 9,99 .* TOTAL R\$ 79,89/);
   await page.locator('#extra [data-extra="copinho-cookie-cacau"][data-action="extra-inc"]').click();
-  assert.match(await text(page, "#resumo"), /TOTAL R\$ 95,70/);
+  assert.match(await text(page, "#resumo"), /TOTAL R\$ 89,88/);
   await page.locator('#extra [data-extra="copinho-cookie-cacau"][data-action="extra-dec"]').click();
-  assert.match(await text(page, "#resumo"), /TOTAL R\$ 82,80/);
-  assert.equal(await text(page, "[data-bar-value]"), "R$ 82,80");
+  assert.match(await text(page, "#resumo"), /TOTAL R\$ 79,89/);
+  assert.equal(await text(page, "[data-bar-value]"), "R$ 79,89");
   await page.locator("#cta-principal").click();
   await page.waitForTimeout(300);
-  assert.match(await text(page, "#carrinho"), /Preço normal \(4 pacotes \+ extras\) R\$ 176,50 Desconto da promoção - R\$ 93,70 Produtos R\$ 82,80/);
+  assert.match(await text(page, "#carrinho"), /Preço normal \(4 pacotes \+ extras\) R\$ 173,59 Desconto da promoção - R\$ 93,70 Produtos R\$ 79,89/);
   assert.equal(await text(page, "#carrinho-qtd"), "5");
   const o = (await order(page)).order;
-  assert.deepEqual(o.extras, [{ id: "copinho-cookie-cacau", nome: "Copinho de Cookie sabor Cacau — 68g", preco: 12.9, quantidade: 1, total: 12.9 }]);
-  assert.equal(o.total, 82.8);
+  assert.deepEqual(o.extras, [{ id: "copinho-cookie-cacau", nome: "Copinho de Cookie sabor Cacau — 68g", preco: 9.99, quantidade: 1, total: 9.99 }]);
+  assert.equal(o.total, 79.89);
   await shot(page, "m-carrinho-cookie");
   // No carrinho, o outro sabor aparece como sugestão (o título "COMPLETE SEU CAFÉ" uma vez só)
-  assert.match(await text(page, "#carrinho"), /Copinho de Cookie sabor Cacau — 68g R\$ 12,90 .* COMPLETE SEU CAFÉ 🍪 Copinho de Cookie sabor Choco Vanilla — 68g Adicionar ao pedido por \+ R\$ 12,90/);
+  assert.match(await text(page, "#carrinho"), /Copinho de Cookie sabor Cacau — 68g R\$ 9,99 .* COMPLETE SEU CAFÉ 🍪 Copinho de Cookie sabor Choco Vanilla — 68g Adicionar ao pedido por \+ R\$ 9,99/);
   await page.locator('#carrinho [data-extra="copinho-cookie-cacau"][data-action="extra-remove"]').click();
   assert.equal(await page.locator("#carrinho .cextra__title").count(), 1);
-  assert.match(await text(page, "#carrinho"), /COMPLETE SEU CAFÉ 🍪.*Adicionar ao pedido por \+ R\$ 12,90/);
+  assert.match(await text(page, "#carrinho"), /COMPLETE SEU CAFÉ 🍪.*Adicionar ao pedido por \+ R\$ 9,99/);
   assert.match(await text(page, "#carrinho"), /TOTAL R\$ 69,90/);
   const ev = await events(page);
   assert.ok(ev.includes("add_upsell"));
@@ -544,25 +548,25 @@ await check("23 copinho de cookie: em breve sem preço; com COOKIE_PRICE soma no
 });
 
 await check("23 biscoito xícara nos dois sabores do site (Cacau e Choco Vanilla): um card por sabor, cada um soma no pedido", async () => {
-  const { ctx, page } = await open(MOBILE, { config: (src) => src.replace("var COOKIE_PRICE = null;", "var COOKIE_PRICE = 12.90;") });
+  const { ctx, page } = await open(MOBILE);
   assert.equal(await page.locator("#extra .extra").count(), 2);
   assert.match(await text(page, "#extra"), /Copinho de Cookie sabor Cacau — 68g .* Copinho de Cookie sabor Choco Vanilla — 68g/);
   assert.deepEqual(await page.locator("#extra .extra img").evaluateAll((els) => els.map((i) => i.alt)), ["Copinho de Cookie sabor Cacau — 68g", "Copinho de Cookie sabor Choco Vanilla — 68g"]);
   await page.locator('#extra [data-extra="copinho-cookie-cacau"][data-action="extra-add"]').click();
   await page.locator('#extra [data-extra="copinho-cookie-choco-vanilla"][data-action="extra-add"]').click();
   await page.locator('#extra [data-extra="copinho-cookie-choco-vanilla"][data-action="extra-inc"]').click();
-  assert.match(await text(page, "#resumo"), /1× Copinho de Cookie sabor Cacau — 68g \+ R\$ 12,90 2× Copinho de Cookie sabor Choco Vanilla — 68g \+ R\$ 25,80/);
-  assert.match(await text(page, "#resumo"), /Extras \+ R\$ 38,70 .* TOTAL R\$ 68,60/);
+  assert.match(await text(page, "#resumo"), /1× Copinho de Cookie sabor Cacau — 68g \+ R\$ 9,99 2× Copinho de Cookie sabor Choco Vanilla — 68g \+ R\$ 19,98/);
+  assert.match(await text(page, "#resumo"), /Extras \+ R\$ 29,97 .* TOTAL R\$ 59,87/);
   await pickFlavors(page, ["bourbon"]);
   await page.locator("#cta-principal").click();
   await page.waitForTimeout(300);
   assert.equal(await text(page, "#carrinho-qtd"), "4");
   assert.equal(await page.locator("#carrinho .cextra__title").count(), 0, "sem sugestão quando os dois já estão no pedido");
   const o = (await order(page)).order;
-  assert.deepEqual(o.extras.map((e) => [e.id, e.quantidade, e.total]), [["copinho-cookie-cacau", 1, 12.9], ["copinho-cookie-choco-vanilla", 2, 25.8]]);
-  assert.equal(o.total, 68.6);
+  assert.deepEqual(o.extras.map((e) => [e.id, e.quantidade, e.total]), [["copinho-cookie-cacau", 1, 9.99], ["copinho-cookie-choco-vanilla", 2, 19.98]]);
+  assert.equal(o.total, 59.87);
   await page.locator('#carrinho [data-extra="copinho-cookie-cacau"][data-action="extra-remove"]').click();
-  assert.match(await text(page, "#carrinho"), /TOTAL R\$ 55,70/);
+  assert.match(await text(page, "#carrinho"), /TOTAL R\$ 49,88/);
   assert.equal((await order(page)).order.extras.length, 1);
   assert.deepEqual(page.errors, []);
   await ctx.close();
@@ -685,7 +689,7 @@ await check("24 validação: não chega ao checkout sem todos os sabores", async
 });
 
 await check("analytics: eventos preparados (view_item … begin_checkout) e purchase em obrigado.html", async () => {
-  const { ctx, page } = await open(MOBILE, { config: (src) => src.replace("var COOKIE_PRICE = null;", "var COOKIE_PRICE = 9.90;") });
+  const { ctx, page } = await open(MOBILE);
   await page.locator('#ofertas label:has(input[value="1kg"])').click();
   await pickFlavors(page, ["caramelo", "bourbon", "caramelo", "espresso"]);
   await page.locator('#entrega label:has(input[value="sedex"])').click();
@@ -699,16 +703,17 @@ await check("analytics: eventos preparados (view_item … begin_checkout) e purc
     assert.ok(ev.includes(name), "faltou o evento " + name + " em " + ev.join(","));
   }
   const begin = await page.evaluate(() => window.dataLayer.filter((e) => e.event === "begin_checkout").pop());
-  assert.equal(begin.ecommerce.value, 94.8);
+  assert.equal(begin.ecommerce.value, 94.89);
   assert.equal(begin.ecommerce.items[0].item_id, "4x250");
   assert.equal(begin.ecommerce.items[0].price, 69.9);
   assert.equal(begin.ecommerce.items[1].item_id, "copinho-cookie-cacau");
   // Página de retorno do checkout
   await page.goto(url + "/obrigado.html", { waitUntil: "networkidle" });
-  assert.match(await text(page, "#obrigado"), /Pedido recebido! .* Kit Variedade — 4×250g 2× Caramelo 250g 1× Bourbon 250g 1× Espresso 250g 1× Copinho de Cookie sabor Cacau — 68g .* TOTAL R\$ 94,80/);
+  assert.match(await text(page, "#obrigado"), /Pedido recebido! .* Kit Variedade — 4×250g 2× Caramelo 250g 1× Bourbon 250g 1× Espresso 250g 1× Copinho de Cookie sabor Cacau — 68g .* TOTAL R\$ 94,89/);
   const purchases = await page.evaluate(() => window.dataLayer.filter((e) => e.event === "purchase"));
   assert.equal(purchases.length, 1);
-  assert.equal(purchases[0].ecommerce.value, 94.8);
+  assert.equal(purchases[0].ecommerce.value, 94.89);
+  assert.equal(purchases[0].ecommerce.items[1].price, 9.99);
   await page.reload({ waitUntil: "networkidle" });
   assert.equal(await page.evaluate(() => window.dataLayer.filter((e) => e.event === "purchase").length), 0, "purchase só uma vez por pedido");
   await shot(page, "m-obrigado");

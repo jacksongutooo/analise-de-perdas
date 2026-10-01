@@ -275,41 +275,39 @@ describe("frete e totais", () => {
     assert.equal(t.shipping.days, 5);
   });
 
-  test("copinho de cookie: sem preço definido não entra no pedido", () => {
-    const extra = catalog.extraById["copinho-cookie-cacau"];
+  test("copinho de cookie: R$ 9,99 cada (COOKIE_PRICE) e soma ao total", () => {
+    assert.equal(brl(catalog.extraById["copinho-cookie-cacau"].priceCents), "R$ 9,99");
+    const t = core.computeTotals(catalog, { ...kit4, shippingId: "sedex", extras: { "copinho-cookie-cacau": 2 } });
+    assert.equal(brl(t.extrasCents), "R$ 19,98");
+    assert.equal(brl(t.subtotalCents), "R$ 89,88");
+    assert.equal(brl(t.totalCents), "R$ 104,88");
+    assert.equal(brl(t.originalCents), "R$ 183,58"); // preço normal: R$ 163,60 + R$ 19,98
+  });
+
+  test("copinho de cookie sem preço (COOKIE_PRICE = null): em breve, fora do pedido", () => {
+    const cat = withConfig((c) => c.extras.forEach((e) => (e.price = null)));
+    const extra = cat.extraById["copinho-cookie-cacau"];
     assert.equal(extra.priceCents, null);
     assert.equal(extra.available, false);
     const input = { ...kit4, shippingId: "pac", extras: { "copinho-cookie-cacau": 1 } };
-    assert.equal(core.computeTotals(catalog, input).extrasCents, 0);
-    assert.equal(core.validateOrder(catalog, input).ok, false);
-  });
-
-  test("copinho de cookie com COOKIE_PRICE definido soma ao total", () => {
-    const cat = withConfig((c) => {
-      c.extras[0].price = 12.9;
-    });
-    const t = core.computeTotals(cat, { ...kit4, shippingId: "sedex", extras: { "copinho-cookie-cacau": 2 } });
-    assert.equal(brl(t.extrasCents), "R$ 25,80");
-    assert.equal(brl(t.subtotalCents), "R$ 95,70");
-    assert.equal(brl(t.totalCents), "R$ 110,70");
-    assert.equal(brl(t.originalCents), "R$ 189,40"); // preço normal: R$ 163,60 + R$ 25,80
+    assert.equal(core.computeTotals(cat, input).extrasCents, 0);
+    assert.equal(core.validateOrder(cat, input).ok, false);
   });
 
   test("biscoito xícara nos dois sabores do site oficial (Cacau e Choco Vanilla), cada um com seu card", () => {
     assert.deepEqual(
-      catalog.extras.map((e) => [e.id, e.fullName, e.available]),
+      catalog.extras.map((e) => [e.id, e.fullName, brl(e.priceCents), e.available]),
       [
-        ["copinho-cookie-cacau", "Copinho de Cookie sabor Cacau — 68g", false],
-        ["copinho-cookie-choco-vanilla", "Copinho de Cookie sabor Choco Vanilla — 68g", false],
+        ["copinho-cookie-cacau", "Copinho de Cookie sabor Cacau — 68g", "R$ 9,99", true],
+        ["copinho-cookie-choco-vanilla", "Copinho de Cookie sabor Choco Vanilla — 68g", "R$ 9,99", true],
       ],
     );
-    const cat = withConfig((c) => c.extras.forEach((e) => (e.price = 12.9)));
     const input = { ...kit4, shippingId: "pac", extras: { "copinho-cookie-cacau": 1, "copinho-cookie-choco-vanilla": 2 } };
-    const t = core.computeTotals(cat, input);
-    assert.equal(brl(t.extrasCents), "R$ 38,70");
-    assert.equal(brl(t.totalCents), "R$ 108,60");
-    const { order } = core.buildOrder(cat, input, { id: "BG-TESTE", now: new Date("2026-10-01T12:00:00Z") });
-    assert.deepEqual(order.extras.map((e) => [e.id, e.quantidade, e.total]), [["copinho-cookie-cacau", 1, 12.9], ["copinho-cookie-choco-vanilla", 2, 25.8]]);
+    const t = core.computeTotals(catalog, input);
+    assert.equal(brl(t.extrasCents), "R$ 29,97");
+    assert.equal(brl(t.totalCents), "R$ 99,87");
+    const { order } = core.buildOrder(catalog, input, { id: "BG-TESTE", now: new Date("2026-10-01T12:00:00Z") });
+    assert.deepEqual(order.extras.map((e) => [e.id, e.quantidade, e.total]), [["copinho-cookie-cacau", 1, 9.99], ["copinho-cookie-choco-vanilla", 2, 19.98]]);
   });
 });
 
@@ -337,17 +335,14 @@ describe("pedido", () => {
   });
 
   test("objeto do pedido com SEDEX e copinho de cookie", () => {
-    const cat = withConfig((c) => {
-      c.extras[0].price = 12.9;
-    });
-    const s = pick(cat, "2x500", ["espresso", "espresso"]);
-    const { order } = core.buildOrder(cat, { ...s, shippingId: "sedex", extras: { "copinho-cookie-cacau": 1 } }, meta);
+    const s = pick(catalog, "2x500", ["espresso", "espresso"]);
+    const { order } = core.buildOrder(catalog, { ...s, shippingId: "sedex", extras: { "copinho-cookie-cacau": 1 } }, meta);
     assert.equal(order.tipoKit, "2x500g");
     assert.deepEqual(order.itens, [{ sabor: "Espresso", saborId: "espresso", peso: 500, quantidade: 2 }]);
-    assert.deepEqual(order.extras, [{ id: "copinho-cookie-cacau", nome: "Copinho de Cookie sabor Cacau — 68g", preco: 12.9, quantidade: 1, total: 12.9 }]);
-    assert.equal(order.subtotal, 82.8);
+    assert.deepEqual(order.extras, [{ id: "copinho-cookie-cacau", nome: "Copinho de Cookie sabor Cacau — 68g", preco: 9.99, quantidade: 1, total: 9.99 }]);
+    assert.equal(order.subtotal, 79.89);
     assert.deepEqual(order.shipping, { id: "sedex", method: "SEDEX", price: 15, estimatedDays: 5 });
-    assert.equal(order.total, 97.8);
+    assert.equal(order.total, 94.89);
   });
 
   test("não monta pedido com sabor faltando", () => {

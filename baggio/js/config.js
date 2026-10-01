@@ -37,9 +37,8 @@
 
   /* ── COPINHO DE COOKIE (extra) ────────────────────────────────────────────
      Preço de cada copinho (vale para os dois sabores: Cacau e Choco Vanilla).
-     Ainda não definido: enquanto for null, eles aparecem como "em breve" e não
-     entram no pedido. Para liberar, ex.: var COOKIE_PRICE = 15.90; */
-  var COOKIE_PRICE = null;
+     Com null, eles aparecem como "em breve" e não entram no pedido. */
+  var COOKIE_PRICE = 9.99;
 
   /* ── FRETE ────────────────────────────────────────────────────────────────
      price: valor somado ao pedido (0 = grátis).

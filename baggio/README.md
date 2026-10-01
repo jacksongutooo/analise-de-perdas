@@ -29,7 +29,8 @@ estática.
   mantidos (e voltam se o cliente retornar a um kit maior).
 - **Entrega:** PAC grátis já marcado e SEDEX por + R$ 15,00. O total muda na hora, sem recarregar.
 - **Copinho de Cookie Muma (COMPLETE SEU CAFÉ 🍪)** nos dois sabores do site oficial, **Cacau** e **Choco
-  Vanilla** (68g), cada um com o seu card e "Adicionar ao pedido por + R$ X". Cada sabor é um item de `EXTRAS`.
+  Vanilla** (68g), por **R$ 9,99 cada**, cada um com o seu card e "Adicionar ao pedido por + R$ 9,99". Cada sabor é
+  um item de `EXTRAS`.
 - **Resumo do kit** com "De / Por / Você economiza" e o total.
 - **Barra fixa no rodapé** com preço, frete e o botão (ESCOLHER SABOR/SABORES enquanto falta sabor, COMPRAR
   AGORA com o pedido pronto).
@@ -51,7 +52,7 @@ Quase tudo fica em **`js/config.js`**. Nenhum preço está digitado em outro arq
 |---|---|
 | Preços dos cafés (normal e promoção) | `js/config.js` → `PRICES` |
 | Promoção (selo, quadro e faixa do topo) | `js/config.js` → `PROMO` |
-| Preço do copinho de cookie | `js/config.js` → `COOKIE_PRICE` |
+| Preço do copinho de cookie (R$ 9,99, vale para os dois sabores) | `js/config.js` → `COOKIE_PRICE` |
 | Copinho de cookie e outros sabores do biscoito xícara | `js/config.js` → `EXTRAS` |
 | Sabores (adicionar, remover, esgotado, Blend Premiado, fotos) | `js/config.js` → `FLAVORS` |
 | Kits, selos, kits ligados/desligados e o que aparece de cara | `js/config.js` → `OFFERS` e `OFFER_MENU` |
@@ -242,7 +243,6 @@ na primeira visita, sem contar as fotos oficiais.
 - [ ] Fotos oficiais no lugar das imagens "FOTO PROVISÓRIA" (galeria, sabores e os dois copinhos de cookie).
 - [ ] Preços do Kit com 2 e do Kit com 3, se forem voltar (hoje desligados).
 - [ ] Avaliações reais em `js/reviews.js` (ou `showPlaceholders: false`).
-- [ ] `COOKIE_PRICE` definido (até lá os copinhos aparecem como "em breve").
 - [ ] `CHECKOUT` configurado (`"link"` ou `"whatsapp"`); no modo `"demo"` o cliente não chega ao pagamento.
 - [ ] Rodapé em `STORE`: WhatsApp, e-mail, horário, razão social, CNPJ, endereço e os links das políticas
       (os campos vazios aparecem como "[a preencher]").
