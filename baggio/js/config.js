@@ -63,20 +63,89 @@
   var DEFAULT_SHIPPING = "pac"; // entrega já marcada ao abrir a página
 
   /* ── SABORES ──────────────────────────────────────────────────────────────
-     Adicionar: copie uma linha e troque id (sem espaço/acento), nome e foto.
-     Remover: apague a linha. Esgotou? available: false (aparece "Indisponível").
+     Adicionar: copie um bloco e troque id (sem espaço/acento), nome e foto.
+     Remover: apague o bloco. Esgotou? available: false (aparece "Indisponível").
      award: true mostra o selo "🏅 BLEND PREMIADO".
      sizes: pesos em que o sabor existe (padrão: todos os pesos dos kits).
      image: foto do pacote de 250g; image500: foto do pacote de 500g (opcional).
-     color: cor de apoio do sabor (usada enquanto a foto carrega). */
+     color: cor de apoio do sabor (usada enquanto a foto carrega).
+     description, notes, pairing, tagline e origin: textos do site oficial da
+     Baggio (baggiocafe.com.br), mostrados em "Conheça os sabores". */
   var FLAVORS = [
-    { id: "chocolate-com-avela", name: "Chocolate com Avelã", image: "img/sabores/chocolate-com-avela.svg", color: "#7b4a2d" },
-    { id: "chocolate-com-menta", name: "Chocolate com Menta", image: "img/sabores/chocolate-com-menta.svg", color: "#2f7d6d" },
-    { id: "chocolate-trufado", name: "Chocolate Trufado", image: "img/sabores/chocolate-trufado.svg", color: "#4a2c21" },
-    { id: "caramelo", name: "Caramelo", image: "img/sabores/caramelo.svg", color: "#c47f2c" },
-    { id: "baunilha", name: "Baunilha", image: "img/sabores/baunilha.svg", color: "#d9bf86" },
-    { id: "bourbon", name: "Bourbon", image: "img/sabores/bourbon.svg", color: "#8c2f23", award: true },
-    { id: "espresso", name: "Espresso", image: "img/sabores/espresso.svg", color: "#1f1a17", award: true },
+    {
+      id: "chocolate-com-avela",
+      name: "Chocolate com Avelã",
+      image: "img/sabores/chocolate-com-avela-250g.webp",
+      color: "#7b4a2d",
+      description:
+        "Sabor equilibrado e intensidade média, com textura encorpada e aveludada e final prolongado. Aroma de nozes e notas de chocolate: o doce do chocolate ao leite com o sabor tostado da avelã.",
+      notes: "Nozes e castanhas tostadas, chocolate ao leite",
+      pairing: "Sobremesas e finalizações",
+    },
+    {
+      id: "chocolate-com-menta",
+      name: "Chocolate com Menta",
+      image: "img/sabores/chocolate-com-menta-250g.webp",
+      color: "#2f7d6d",
+      description:
+        "Para quem é fã de café com um toque de frescor: sabor doce e fresco, intensidade média e baixa acidez, que realça o corpo prolongado.",
+      notes: "Menta e chocolate ao leite",
+      pairing: "Bebidas lácteas e cappuccinos",
+    },
+    {
+      id: "chocolate-trufado",
+      name: "Chocolate Trufado",
+      image: "img/sabores/chocolate-trufado-250g.webp",
+      color: "#4a2c21",
+      description:
+        "Sabor doce, intensidade média e textura encorpada e aveludada. Aroma de chocolate ao leite, com notas de trufa de chocolate que trazem um toque extra de cremosidade.",
+      notes: "Frutas vermelhas secas",
+      pairing: "Bebidas lácteas e cappuccinos",
+    },
+    {
+      id: "caramelo",
+      name: "Caramelo",
+      image: "img/sabores/caramelo-250g.webp",
+      color: "#c47f2c",
+      description:
+        "Para quem gosta de cafés naturalmente adocicados: intensidade média e baixa acidez, que realça o corpo prolongado, com sabor marcante a cada gole.",
+      notes: "Caramelizadas e vibrantes",
+      pairing: "Cafés coados, leite e cappuccinos",
+    },
+    {
+      id: "baunilha",
+      name: "Baunilha",
+      image: "img/sabores/baunilha-250g.webp",
+      color: "#d9bf86",
+      description:
+        "Baggio Aromas Vanilla: aroma sutil e refinado, que une o sabor marcante do café à doçura delicada da baunilha, em uma bebida encorpada e aveludada.",
+      notes: "Baunilha",
+      pairing: "Bebidas lácteas e cappuccinos",
+    },
+    {
+      id: "bourbon",
+      name: "Bourbon",
+      image: "img/sabores/bourbon-250g.webp",
+      image500: "img/sabores/bourbon-500g.webp",
+      color: "#8c2f23",
+      award: true,
+      tagline: "Encorpado, doce, com notas de chocolate.",
+      description:
+        "Café especial da variedade Bourbon, de torra artesanal: paladar definido, acidez sutil, notas marcantes e corpo e doçura muito presentes.",
+      origin: "Mogiana Paulista e Sul de Minas",
+    },
+    {
+      id: "espresso",
+      name: "Espresso",
+      image: "img/sabores/espresso-250g.webp",
+      image500: "img/sabores/espresso-500g.webp",
+      color: "#1f1a17",
+      award: true,
+      tagline: "Equilibrado, delicado, com notas frutadas.",
+      description:
+        "Desenvolvido para paladares exigentes: levemente adocicado, com aroma floral e traços frutados, sabor pronunciado e amargor muito baixo.",
+      origin: "Cerrado Mineiro",
+    },
   ];
 
   /* ── KITS (OFERTAS) ───────────────────────────────────────────────────────
@@ -135,9 +204,9 @@
       id: "copinho-cookie-cacau",
       name: "Copinho de Cookie sabor Cacau",
       weight: "68g",
-      brand: "Muma",
+      brand: "Muma & Baggio",
       description: "Copinho de cookie sabor cacau para acompanhar o seu café.",
-      image: "img/extras/copinho-cookie-cacau.svg",
+      image: "img/extras/copinho-cookie-cacau.webp",
       price: COOKIE_PRICE,
       maxQuantity: 10,
     },
@@ -146,26 +215,27 @@
       id: "copinho-cookie-choco-vanilla",
       name: "Copinho de Cookie sabor Choco Vanilla",
       weight: "68g",
-      brand: "Muma",
+      brand: "Muma & Baggio",
       description: "Copinho de cookie sabor chocolate com baunilha para acompanhar o seu café.",
-      image: "img/extras/copinho-cookie-choco-vanilla.svg",
+      image: "img/extras/copinho-cookie-choco-vanilla.webp",
       price: COOKIE_PRICE,
       maxQuantity: 10,
     },
   ];
 
   /* ── FOTOS DA GALERIA ─────────────────────────────────────────────────────
-     A primeira é a foto principal (carrega primeiro). Fotos oficiais: coloque
-     em img/galeria/ (quadradas, 1200×1200, WebP ou JPG) e troque o caminho. */
+     Fotos oficiais da Baggio, padronizadas (quadradas, 1200×1200, fundo branco).
+     A primeira é a foto principal (carrega primeiro). thumb: miniatura 240×240
+     usada na fileira de miniaturas do computador (opcional). */
   var GALLERY = [
-    { src: "img/galeria/01-embalagem.svg", alt: "Embalagens do Café Baggio" },
-    { src: "img/galeria/02-cafe-servido.svg", alt: "Café Baggio servido na xícara" },
-    { src: "img/galeria/03-detalhes.svg", alt: "Detalhes da embalagem do Café Baggio" },
-    { src: "img/galeria/04-preparo.svg", alt: "Preparo do Café Baggio" },
-    { src: "img/galeria/05-sabores.svg", alt: "Os sabores do Café Baggio" },
-    { src: "img/galeria/06-blends-premiados.svg", alt: "Blends Premiados Bourbon e Espresso" },
-    { src: "img/galeria/07-kit-variedade.svg", alt: "Kit Variedade com 4 pacotes de 250g" },
-    { src: "img/galeria/08-kit-favoritos.svg", alt: "Kit Favoritos com 2 pacotes de 500g" },
+    { src: "img/galeria/01-sabores.webp", thumb: "img/galeria/01-sabores-mini.webp", alt: "Os 7 sabores do Café Baggio em pacotes de 250g" },
+    { src: "img/galeria/02-bourbon-500g.webp", thumb: "img/galeria/02-bourbon-500g-mini.webp", alt: "Café Baggio Bourbon 500g ao lado de uma xícara de café" },
+    { src: "img/galeria/03-pacote-250g.webp", thumb: "img/galeria/03-pacote-250g-mini.webp", alt: "Pacote de 250g Baggio Aromas Chocolate com Avelã" },
+    { src: "img/galeria/04-verso.webp", thumb: "img/galeria/04-verso-mini.webp", alt: "Verso do pacote com origem, torra, moagem e qualidade do café" },
+    { src: "img/galeria/05-blends-premiados.webp", thumb: "img/galeria/05-blends-premiados-mini.webp", alt: "Blends Premiados Bourbon e Espresso em pacotes de 250g" },
+    { src: "img/galeria/06-espresso-500g.webp", thumb: "img/galeria/06-espresso-500g-mini.webp", alt: "Café Baggio Espresso 500g com grãos de café" },
+    { src: "img/galeria/07-kit-variedade.webp", thumb: "img/galeria/07-kit-variedade-mini.webp", alt: "Kit Variedade: 4 pacotes de 250g" },
+    { src: "img/galeria/08-kit-favoritos.webp", thumb: "img/galeria/08-kit-favoritos-mini.webp", alt: "Kit Favoritos: 2 pacotes de 500g" },
   ];
 
   /* ── LOJA E TEXTOS CURTOS ─────────────────────────────────────────────────
@@ -176,6 +246,7 @@
     logo: "", // caminho do logo (ex.: "img/logo.svg"); vazio = logo em texto
     title: "Café Baggio — {sabores.total} sabores para montar seu kit | Pacotes de 250g e 500g",
     description: "Combine ou repita sabores do jeito que quiser e receba em casa com frete grátis no PAC.",
+    facts: ["Café especial", "100% arábica", "Torra média"], // selos abaixo da descrição (site oficial)
     // Faixa do topo: partes separadas por "•"; o que não couber na tela fica de fora
     // (com a promoção ligada, a frase de PROMO.topBar vem primeiro).
     topBar: "🚚 FRETE GRÁTIS no PAC  •  ⚡ SEDEX em até {frete.sedex.prazo} dias úteis",
@@ -221,6 +292,23 @@
     { icon: "🏅", title: "Blends premiados", text: "Bourbon e Espresso" },
     { icon: "⭐", title: "{vendidos.curto}", text: "" },
   ];
+
+  /* ── CONHEÇA OS SABORES ───────────────────────────────────────────────────
+     Descrição de cada sabor (vem de FLAVORS) e a ficha técnica abaixo, conforme
+     o site oficial da Baggio e o verso dos pacotes de 250g. */
+  var ABOUT = {
+    title: "CONHEÇA OS SABORES",
+    intro: "Cafés especiais Baggio em {sabores.total} sabores. Toque em um sabor para ver a descrição.",
+    specsTitle: "Ficha técnica (pacotes de 250g)",
+    specs: [
+      { label: "Tipo", value: "Café especial, 100% arábica" },
+      { label: "Qualidade", value: "Pontuação acima de 85" },
+      { label: "Torra e moagem", value: "Média (café torrado e moído)" },
+      { label: "Origem", value: "Mogiana Paulista e Sul de Minas (Espresso: Cerrado Mineiro)" },
+      { label: "Marca", value: "Baggio Café, desde 1886" },
+    ],
+    source: "Descrições e ficha técnica conforme o site oficial da Baggio Café (baggiocafe.com.br).",
+  };
 
   /* ── DÚVIDAS FREQUENTES ───────────────────────────────────────────────── */
   var FAQ = [
@@ -295,6 +383,7 @@
     gallery: GALLERY,
     promo: PROMO,
     benefits: BENEFITS,
+    about: ABOUT,
     faq: FAQ,
     checkout: CHECKOUT,
     analytics: ANALYTICS,

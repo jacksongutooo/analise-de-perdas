@@ -509,7 +509,7 @@ await check("23 copinho de cookie: R$ 9,99 cada, soma no total, carrinho e pedid
   const a = await open(MOBILE, { config: (src) => src.replace("var COOKIE_PRICE = 9.99;", "var COOKIE_PRICE = null;") });
   assert.match(
     await text(a.page, "#extra"),
-    /COMPLETE SEU CAFÉ 🍪 MUMA Copinho de Cookie sabor Cacau — 68g .* Preço em breve Disponível em breve MUMA Copinho de Cookie sabor Choco Vanilla — 68g .* Preço em breve Disponível em breve/,
+    /COMPLETE SEU CAFÉ 🍪 MUMA & BAGGIO Copinho de Cookie sabor Cacau — 68g .* Preço em breve Disponível em breve MUMA & BAGGIO Copinho de Cookie sabor Choco Vanilla — 68g .* Preço em breve Disponível em breve/,
   );
   assert.deepEqual(await a.page.locator("#extra button").evaluateAll((els) => els.map((b) => b.disabled)), [true, true]);
   await a.ctx.close();
@@ -791,16 +791,50 @@ await check("25 carregamento e performance (celular): peso, requisições, LCP e
     };
   });
   const bytes = stats.requests.reduce((s, r) => s + r.bytes, 0);
-  const gz = stats.requests.reduce((s, r) => s + (r.missing ? 0 : gzipSync(readFileSync(path.join(ROOT, r.path))).length), 0);
+  const isImage = (r) => /\.(webp|jpe?g|png|gif|avif)$/i.test(r.path);
+  // Código e textos (HTML, CSS, JS, SVG) comprimidos como as hospedagens entregam; fotos já vêm comprimidas.
+  const gz = stats.requests.filter((r) => !isImage(r)).reduce((s, r) => s + (r.missing ? 0 : gzipSync(readFileSync(path.join(ROOT, r.path))).length), 0);
+  const imgBytes = stats.requests.filter(isImage).reduce((s, r) => s + r.bytes, 0);
+  const main = stats.requests.find((r) => r.path.endsWith("/galeria/01-sabores.webp"));
   const byType = {};
   stats.requests.forEach((r) => {
     const ext = r.path.split(".").pop();
     byType[ext] = (byType[ext] || 0) + r.bytes;
   });
-  console.log("    performance (4G lento simulado + CPU 4× mais lenta):", JSON.stringify({ ...perf, kbSemCompressao: Math.round(bytes / 1024), kbGzip: Math.round(gz / 1024), porTipoKB: Object.fromEntries(Object.entries(byType).map(([k, v]) => [k, Math.round(v / 1024)])) }));
+  console.log("    performance (4G lento simulado + CPU 4× mais lenta):", JSON.stringify({ ...perf, kbSemCompressao: Math.round(bytes / 1024), kbCodigoGzip: Math.round(gz / 1024), kbFotos: Math.round(imgBytes / 1024), porTipoKB: Object.fromEntries(Object.entries(byType).map(([k, v]) => [k, Math.round(v / 1024)])) }));
   assert.ok(perf.cls < 0.1, "CLS alto: " + perf.cls);
-  assert.ok(gz < 100 * 1024, "página pesada (gzip): " + gz);
+  assert.ok(perf.lcp < 4000, "foto principal demorou para aparecer (LCP): " + perf.lcp);
+  assert.ok(gz < 100 * 1024, "código pesado (gzip): " + gz);
+  assert.ok(main && main.bytes < 150 * 1024, "foto principal pesada: " + (main && main.bytes));
+  assert.ok(imgBytes < 700 * 1024, "fotos pesadas na primeira carga: " + imgBytes);
   assert.equal(stats.requests.filter((r) => r.missing).length, 0, "arquivos faltando: " + JSON.stringify(stats.requests.filter((r) => r.missing)));
+  await ctx.close();
+});
+
+await check("fotos oficiais (cada peso com a sua foto) e 'Conheça os sabores' com os textos do site oficial", async () => {
+  const { ctx, page } = await open(MOBILE);
+  // Sem imagens provisórias (só a foto de exemplo das avaliações placeholder continua)
+  const srcs = await page.evaluate(() => [...document.images].map((i) => i.getAttribute("src")));
+  assert.deepEqual(srcs.filter((s) => s.endsWith(".svg") && !s.includes("exemplo-foto-cliente")), []);
+  assert.equal(await page.locator("#galeria img").first().getAttribute("src"), "img/galeria/01-sabores.webp");
+  assert.equal(await page.locator("#galeria .gallery__thumb img").first().getAttribute("src"), "img/galeria/01-sabores-mini.webp");
+  const img = (id) => page.locator(`#montar .flavor[data-flavor="${id}"] img`).getAttribute("src");
+  assert.equal(await img("bourbon"), "img/sabores/bourbon-250g.webp");
+  await page.locator('#ofertas label:has(input[value="1x500"])').click();
+  assert.equal(await img("bourbon"), "img/sabores/bourbon-500g.webp", "500g usa a foto do pacote de 500g");
+  assert.equal(await img("espresso"), "img/sabores/espresso-500g.webp");
+  // Selos e seção com os textos oficiais
+  assert.equal(await text(page, "#info .pinfo__facts"), "Café especial 100% arábica Torra média");
+  assert.equal(await page.locator('.header__nav a[href="#sabores"]').count(), 1);
+  assert.equal(await page.locator("#sabores .flavinfo__item").count(), 7);
+  const avela = page.locator('#sabores .flavinfo__item[data-flavor="chocolate-com-avela"]');
+  assert.equal(await text(page, '#sabores .flavinfo__item[data-flavor="chocolate-com-avela"] summary'), "Chocolate com Avelã Notas: Nozes e castanhas tostadas, chocolate ao leite");
+  await avela.locator("summary").click();
+  assert.match(nb(await avela.innerText()), /Sabor equilibrado e intensidade média.*Combina com: Sobremesas e finalizações/);
+  assert.match(await text(page, '#sabores .flavinfo__item[data-flavor="bourbon"] summary'), /^Bourbon 🏅 BLEND PREMIADO Encorpado, doce, com notas de chocolate\.$/);
+  assert.match(await text(page, "#sabores .specs"), /Qualidade: Pontuação acima de 85 .*Origem: Mogiana Paulista e Sul de Minas \(Espresso: Cerrado Mineiro\)/);
+  assert.match(await text(page, "#sabores .about__source"), /site oficial da Baggio Café/);
+  assert.deepEqual(page.errors, []);
   await ctx.close();
 });
 

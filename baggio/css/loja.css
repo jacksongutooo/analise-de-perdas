@@ -2091,6 +2091,165 @@ main {
   font-size: 14px;
 }
 
+/* ───────────── Conheça os sabores ───────────── */
+
+.section__intro {
+  margin: -4px 0 12px;
+  color: var(--ink-2);
+  font-size: 14px;
+}
+
+.flavinfo__item {
+  border-top: 1px solid var(--line);
+}
+
+.flavinfo__item:last-child {
+  border-bottom: 1px solid var(--line);
+}
+
+.flavinfo__item summary {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 76px;
+  padding: 10px 32px 10px 0;
+  list-style: none;
+  cursor: pointer;
+}
+
+.flavinfo__item summary::-webkit-details-marker {
+  display: none;
+}
+
+.flavinfo__item summary::after {
+  content: "+";
+  position: absolute;
+  top: 50%;
+  right: 6px;
+  color: var(--brown-2);
+  font-size: 22px;
+  line-height: 1;
+  transform: translateY(-50%);
+}
+
+.flavinfo__item[open] summary::after {
+  content: "−";
+}
+
+.flavinfo__img {
+  flex: none;
+  width: 56px;
+  height: 56px;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: #fff;
+}
+
+.flavinfo__img img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.flavinfo__head {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  min-width: 0;
+}
+
+.flavinfo__head b {
+  font-size: 14.5px;
+}
+
+.flavinfo__head small {
+  color: var(--muted);
+  font-size: 12.5px;
+  line-height: 1.35;
+}
+
+.flavinfo__award {
+  padding: 1px 6px;
+  border: 1px solid var(--gold-line);
+  border-radius: 6px;
+  background: var(--gold-050);
+  color: var(--gold);
+  font-size: 10.5px;
+  font-weight: 800;
+}
+
+.flavinfo__body {
+  padding: 0 8px 14px 68px;
+  color: var(--ink-2);
+  font-size: 14px;
+}
+
+.flavinfo__body dl,
+.specs {
+  display: grid;
+  gap: 4px;
+  margin: 8px 0 0;
+}
+
+.flavinfo__body dl div,
+.specs div {
+  display: flex;
+  gap: 6px;
+}
+
+.flavinfo__body dt,
+.specs dt {
+  flex: none;
+  color: var(--ink);
+  font-weight: 700;
+}
+
+.flavinfo__body dd,
+.specs dd {
+  min-width: 0;
+  margin: 0;
+}
+
+.specs__title {
+  margin: 18px 0 0;
+  color: var(--ink);
+  font-size: 14px;
+  font-weight: 800;
+}
+
+.specs {
+  color: var(--ink-2);
+  font-size: 13.5px;
+}
+
+.about__source {
+  margin-top: 12px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.pinfo__facts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 8px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.pinfo__facts li {
+  padding: 3px 10px;
+  border: 1px solid var(--brown-100);
+  border-radius: 99px;
+  background: var(--brown-050);
+  color: var(--brown);
+  font-size: 12px;
+  font-weight: 700;
+}
+
 /* ───────────── Rodapé ───────────── */
 
 .footer {

@@ -342,7 +342,7 @@
           '"' +
           (i === 0 ? ' aria-current="true"' : "") +
           '><img src="' +
-          esc(g.src) +
+          esc(g.thumb || g.src) +
           '" alt="" width="72" height="72" loading="lazy" decoding="async"></button></li>',
       )
       .join("");
@@ -465,6 +465,9 @@
       '<p class="pinfo__desc">' +
       esc(fill(store.description)) +
       "</p>" +
+      (store.facts && store.facts.length
+        ? '<ul class="pinfo__facts" aria-label="Características">' + store.facts.map((t) => "<li>" + esc(fill(t)) + "</li>").join("") + "</ul>"
+        : "") +
       shippingInfoHTML();
   }
 
@@ -1843,6 +1846,52 @@
       "</ul>";
   }
 
+  /** "Conheça os sabores": descrição de cada sabor e ficha técnica (textos do site oficial). */
+  function renderAbout() {
+    const el = $("#sabores");
+    const about = config.about || {};
+    const list = catalog.flavors.filter((f) => f.description || f.notes || f.tagline);
+    if (!list.length) {
+      el.hidden = true;
+      return;
+    }
+    const row = (label, value) => (value ? "<div><dt>" + esc(label) + ":</dt><dd>" + esc(fill(value)) + "</dd></div>" : "");
+    const items = list
+      .map(
+        (f) =>
+          '<details class="flavinfo__item" data-flavor="' +
+          esc(f.id) +
+          '"><summary><span class="flavinfo__img"><img src="' +
+          esc(f.image) +
+          '" alt="" width="64" height="64" loading="lazy" decoding="async"></span><span class="flavinfo__head"><b>' +
+          esc(f.name) +
+          "</b>" +
+          (f.award ? '<span class="flavinfo__award">🏅 BLEND PREMIADO</span>' : "") +
+          "<small>" +
+          esc(f.tagline || (f.notes ? "Notas: " + f.notes : "")) +
+          "</small></span></summary>" +
+          '<div class="flavinfo__body">' +
+          (f.description ? "<p>" + esc(fill(f.description)) + "</p>" : "") +
+          "<dl>" +
+          row("Notas", f.tagline ? f.notes : "") + // sem tagline, as notas já aparecem no título
+          row("Combina com", f.pairing) +
+          row("Origem", f.origin) +
+          "</dl></div></details>",
+      )
+      .join("");
+    const specs = (about.specs || []).map((item) => row(item.label, item.value)).join("");
+    el.innerHTML =
+      '<div class="section__head"><h2 class="section__title" id="sabores-titulo">' +
+      esc(about.title || "CONHEÇA OS SABORES") +
+      "</h2></div>" +
+      (about.intro ? '<p class="section__intro">' + esc(fill(about.intro)) + "</p>" : "") +
+      '<div class="flavinfo">' +
+      items +
+      "</div>" +
+      (specs ? '<h3 class="specs__title">' + esc(about.specsTitle || "Ficha técnica") + '</h3><dl class="specs">' + specs + "</dl>" : "") +
+      (about.source ? '<p class="about__source">' + esc(fill(about.source)) + "</p>" : "");
+  }
+
   function renderCompare() {
     const el = $("#kits");
     const items = (config.compare || []).filter((c) => catalog.offerById[c.offer]);
@@ -2197,6 +2246,7 @@
       renderGallery();
       renderInfo();
       renderBenefits();
+      renderAbout();
       renderCompare();
       renderReviews();
       renderFaq();

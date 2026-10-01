@@ -146,6 +146,12 @@
         award: !!f.award,
         sizes: Array.isArray(f.sizes) && f.sizes.length ? f.sizes.map(Number) : sizes.slice(),
         available: f.available !== false,
+        // Textos de "Conheça os sabores" (site oficial da marca)
+        description: f.description || "",
+        notes: f.notes || "",
+        pairing: f.pairing || "",
+        tagline: f.tagline || "",
+        origin: f.origin || "",
       };
       if (flavorById[flavor.id]) {
         warn("Sabor com id repetido: " + flavor.id);

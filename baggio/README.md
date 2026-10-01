@@ -10,9 +10,12 @@ estática.
 
 ## O que tem na página
 
+- **Fotos oficiais da Baggio** (do site baggiocafe.com.br), padronizadas: fundo branco, quadradas, cada pacote
+  na mesma proporção e na gramagem certa (250g; Bourbon e Espresso também em 500g).
 - **Primeira dobra de marketplace:** galeria (deslizar no celular, miniaturas no computador, foto ampliada ao
   tocar), selo 🔥 PROMOÇÃO, preço normal riscado, desconto, preço grande, preço por pacote, economia, frete
-  grátis, estrelas, "Ver avaliações" e "+7.000 pacotes vendidos".
+  grátis, estrelas, "Ver avaliações", "+7.000 pacotes vendidos" e os selos "Café especial · 100% arábica ·
+  Torra média".
 - **Promoção bem clara:** a faixa do topo avisa "🔥 PROMOÇÃO: 250g por R$ 29,90 · 500g por R$ 39,90" e, logo
   acima dos kits, um quadro mostra "Pacote de 250g: de ~~R$ 40,90~~ por R$ 29,90" e "Pacote de 500g: de
   ~~R$ 75,00~~ por R$ 39,90". Todos os preços aparecem como "De (riscado) / Por".
@@ -28,7 +31,7 @@ estática.
 - **250g e 500g nunca se misturam:** cada kit tem um peso só. Ao trocar de kit, os sabores já escolhidos são
   mantidos (e voltam se o cliente retornar a um kit maior).
 - **Entrega:** PAC grátis já marcado e SEDEX por + R$ 15,00. O total muda na hora, sem recarregar.
-- **Copinho de Cookie Muma (COMPLETE SEU CAFÉ 🍪)** nos dois sabores do site oficial, **Cacau** e **Choco
+- **Copinho de Cookie Muma & Baggio (COMPLETE SEU CAFÉ 🍪)** nos dois sabores do site oficial, **Cacau** e **Choco
   Vanilla** (68g), por **R$ 9,99 cada**, cada um com o seu card e "Adicionar ao pedido por + R$ 9,99". Cada sabor é
   um item de `EXTRAS`.
 - **Resumo do kit** com "De / Por / Você economiza" e o total.
@@ -39,6 +42,9 @@ estática.
 - **Avaliações estilo marketplace:** nota média, distribuição por estrelas, filtros (todas, 5/4/3 estrelas,
   com fotos, mais recentes e por sabor), faixa "FOTOS DOS CLIENTES" com visualização ampliada, cards com
   sabor, kit, data e "Compra verificada", e o botão "VER TODAS AS AVALIAÇÕES".
+- **Conheça os sabores:** a descrição oficial de cada sabor (notas, com o que combina, origem) e a ficha técnica
+  dos pacotes de 250g (café especial 100% arábica, pontuação acima de 85, torra e moagem médias, origem), tudo
+  conforme o site oficial da Baggio.
 - **Qual kit combina com você?**, benefícios, dúvidas frequentes e rodapé.
 - **Checkout** por link externo, por WhatsApp ou em modo demonstração, e a página `obrigado.html` para a volta
   do pagamento.
@@ -55,10 +61,12 @@ Quase tudo fica em **`js/config.js`**. Nenhum preço está digitado em outro arq
 | Preço do copinho de cookie (R$ 9,99, vale para os dois sabores) | `js/config.js` → `COOKIE_PRICE` |
 | Copinho de cookie e outros sabores do biscoito xícara | `js/config.js` → `EXTRAS` |
 | Sabores (adicionar, remover, esgotado, Blend Premiado, fotos) | `js/config.js` → `FLAVORS` |
+| Descrição de cada sabor (notas, com o que combina, origem) | `js/config.js` → `FLAVORS` |
+| "Conheça os sabores" (título, ficha técnica, fonte) | `js/config.js` → `ABOUT` |
 | Kits, selos, kits ligados/desligados e o que aparece de cara | `js/config.js` → `OFFERS` e `OFFER_MENU` |
 | Frete (PAC, SEDEX, preço e prazo) | `js/config.js` → `SHIPPING` |
 | Fotos da galeria | `js/config.js` → `GALLERY` |
-| Título, descrição, faixa do topo, "+7.000 pacotes vendidos", rodapé | `js/config.js` → `STORE` |
+| Título, descrição, selos, faixa do topo, "+7.000 pacotes vendidos", rodapé | `js/config.js` → `STORE` |
 | Benefícios e dúvidas frequentes | `js/config.js` → `BENEFITS` e `FAQ` |
 | Checkout | `js/config.js` → `CHECKOUT` |
 | Eventos de analytics | `js/config.js` → `ANALYTICS` |
@@ -99,25 +107,26 @@ da tela.
 
 ## Imagens oficiais
 
-Hoje a página usa imagens provisórias (SVG) marcadas com **FOTO PROVISÓRIA**. Para trocar, salve a foto oficial
-na pasta indicada e mude o caminho correspondente em `js/config.js`:
+As fotos são as oficiais do site da Baggio (baggiocafe.com.br), padronizadas para a página: fundo branco,
+formato quadrado, o produto sempre centralizado e na mesma proporção, em WebP (leve).
 
-| Imagem | Pasta | Onde trocar o caminho | Tamanho sugerido |
+| Imagem | Arquivos | Onde está o caminho | Tamanho |
 |---|---|---|---|
-| Galeria (embalagem, café servido, detalhes, preparo, sabores, blends, kits) | `img/galeria/` | `GALLERY` | 1200×1200, quadrada |
-| Foto de cada sabor (pacote 250g) | `img/sabores/` | `FLAVORS` → `image` | 600×600, quadrada |
-| Foto do pacote de 500g (opcional) | `img/sabores/` | `FLAVORS` → `image500` | 600×600, quadrada |
-| Copinho de Cookie (Cacau e Choco Vanilla) | `img/extras/` | `EXTRAS` → `image` | 600×600, quadrada |
+| Galeria (7 sabores, Bourbon 500g com xícara, pacote, verso, Blends Premiados, Espresso 500g, kits) | `img/galeria/01…08-*.webp` (+ `-mini.webp` para as miniaturas) | `GALLERY` | 1200×1200 (miniatura 240×240) |
+| Pacote de 250g de cada sabor | `img/sabores/<sabor>-250g.webp` | `FLAVORS` → `image` | 600×600 |
+| Pacote de 500g (Bourbon e Espresso) | `img/sabores/<sabor>-500g.webp` | `FLAVORS` → `image500` | 600×600 |
+| Copinho de Cookie (Cacau e Choco Vanilla) | `img/extras/*.webp` | `EXTRAS` → `image` | 600×600 |
+| Compartilhamento (WhatsApp, Facebook) | `img/og-image.jpg` | `index.html` | 1200×630 |
 | Fotos dos clientes | `img/avaliacoes/` | `js/reviews.js` → `images` | até 1080px no lado maior |
 | Logo (opcional) | `img/` | `STORE` → `logo` | SVG ou PNG com 64px de altura |
-| Compartilhamento (WhatsApp, Facebook) | `img/og-image.png` | `index.html` | 1200×630 |
 
-Exemplo: salve `img/sabores/caramelo.webp` e troque `image: "img/sabores/caramelo.svg"` por
-`image: "img/sabores/caramelo.webp"`.
+**Pacotes de 500g:** no site oficial só existem Bourbon e Espresso em 500g (e em grãos). Os outros sabores, quando
+escolhidos em 500g, mostram a foto do pacote de 250g até existir a foto oficial de 500g (`image500`). Se um sabor
+não existir em 500g, use `sizes: [250]` nele.
 
-Use WebP ou JPG comprimido (ideal: menos de 150 KB por foto da galeria e menos de 60 KB por foto de sabor). A
-primeira foto da galeria carrega antes das outras; as demais e as das avaliações só carregam quando aparecem na
-tela. Os SVGs provisórios podem ser apagados depois da troca.
+Para trocar ou adicionar uma foto, salve o arquivo na pasta indicada e mude o caminho em `js/config.js`. Use WebP
+ou JPG comprimido (ideal: menos de 150 KB por foto da galeria e menos de 60 KB por foto de sabor). A primeira foto
+da galeria carrega antes das outras; as demais e as das avaliações só carregam quando aparecem na tela.
 
 ## Avaliações
 
@@ -240,7 +249,7 @@ na primeira visita, sem contar as fotos oficiais.
 
 ## Antes de publicar
 
-- [ ] Fotos oficiais no lugar das imagens "FOTO PROVISÓRIA" (galeria, sabores e os dois copinhos de cookie).
+- [ ] Confirmar quais sabores você vende em 500g (no site oficial só há Bourbon e Espresso, em grãos).
 - [ ] Preços do Kit com 2 e do Kit com 3, se forem voltar (hoje desligados).
 - [ ] Avaliações reais em `js/reviews.js` (ou `showPlaceholders: false`).
 - [ ] `CHECKOUT` configurado (`"link"` ou `"whatsapp"`); no modo `"demo"` o cliente não chega ao pagamento.
@@ -248,7 +257,6 @@ na primeira visita, sem contar as fotos oficiais.
       (os campos vazios aparecem como "[a preencher]").
 - [ ] Pixels/GA colados em `index.html` e `obrigado.html`.
 - [ ] Em `index.html`, `og:image` e `canonical` com o endereço completo do domínio.
-- [ ] Conferir se todos os sabores existem em 250g e 500g. Se algum não existir, use `sizes: [250]` nele.
 
 ## Testes
 
@@ -280,6 +288,6 @@ baggio/
 ├── js/loja.js            interface da página
 ├── js/analytics.js       eventos (dataLayer, gtag, fbq, ttq)
 ├── js/obrigado.js        página de obrigado
-├── img/                  imagens (provisórias por enquanto)
+├── img/                  fotos oficiais padronizadas (WebP)
 └── tests/                core.test.js (lógica) e e2e.mjs (navegador)
 ```
